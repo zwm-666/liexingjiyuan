@@ -365,9 +365,9 @@
       );
       ctx.fill();
 
-      // Try sprite rendering first
+      // Try sprite rendering first (only after all sprites are loaded to avoid inconsistent visuals)
       const faction = getEntityFaction(e);
-      const sprite = SpriteLoader && faction ? SpriteLoader.getBuildingSprite(faction, e.key) : null;
+      const sprite = SpriteLoader && SpriteLoader.isReady() && faction ? SpriteLoader.getBuildingSprite(faction, e.key) : null;
       if (sprite) {
         if (flash) {
           ctx.globalAlpha = alpha * 0.6;
@@ -760,10 +760,10 @@
       const ux = e.x,
         uy = drawY;
 
-      // Try sprite rendering first
+      // Try sprite rendering first (only after all sprites are loaded to avoid inconsistent visuals)
       const faction = getEntityFaction(e);
       const unitKey = e.isWorker ? 'worker' : e.key;
-      const unitSprite = SpriteLoader && faction ? SpriteLoader.getUnitSprite(faction, unitKey) : null;
+      const unitSprite = SpriteLoader && SpriteLoader.isReady() && faction ? SpriteLoader.getUnitSprite(faction, unitKey) : null;
       if (unitSprite) {
         const sw = unitSprite.naturalWidth || unitSprite.width;
         const sh = unitSprite.naturalHeight || unitSprite.height;

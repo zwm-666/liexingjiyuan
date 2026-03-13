@@ -1200,11 +1200,21 @@
                 window.RSEGameData;
             // ---- PRELOAD SPRITES ----
             if (window.RSESpriteLoader) {
+                var startBtn = document.getElementById('start-btn');
+                var originalText = startBtn.textContent;
+                startBtn.textContent = '加载素材中...';
+                startBtn.disabled = true;
+                startBtn.style.opacity = '0.6';
                 window.RSESpriteLoader.loadAllSprites(
                     function(loaded, total) {
+                        var pct = Math.round(loaded / total * 100);
+                        startBtn.textContent = '加载素材 ' + pct + '%';
                         console.log('[Sprites] Loading: ' + loaded + '/' + total);
                     },
                     function() {
+                        startBtn.textContent = originalText;
+                        startBtn.disabled = false;
+                        startBtn.style.opacity = '1';
                         console.log('[Sprites] All sprites loaded!');
                     }
                 );
