@@ -6,6 +6,11 @@
     const executeLocalCommand = options.executeLocalCommand || (() => {});
     const BUILDINGS = options.BUILDINGS || {};
 
+    const MAP_W = options.MAP_W || 128;
+    const MAP_H = options.MAP_H || 128;
+    const miniCanvas = options.miniCanvas || null;
+    const canvas = options.canvas || null;
+
     function distance(a, b) {
       const dx = a.x - b.x, dy = a.y - b.y;
       return Math.sqrt(dx * dx + dy * dy);
@@ -158,7 +163,35 @@
       }
     }
 
-    return { findEntityNear, touchToWorld, pinchDist, handleTap, handleLeftClick, handleBoxSelect, handleRightClick };
+    function handleMinimapClick(clientX, clientY) {
+      const G = getGame();
+      if (!G || !miniCanvas || !canvas) return;
+      const rect = miniCanvas.getBoundingClientRect();
+      const mx = clientX - rect.left, my = clientY - rect.top;
+      const tx = (mx / rect.width) * MAP_W, ty = (my / rect.height) * MAP_H;
+      G.camera.x = tx * TILE - canvas.width / 2 / G.camera.zoom;
+      G.camera.y = ty * TILE - canvas.height / 2 / G.camera.zoom;
+    }
+
+    // Wire minimap events if canvas is available
+    if (miniCanvas) {
+      miniCanvas.addEventListener('mousedown', function (ev) {
+        ev.stopPropagation();
+        handleMinimapClick(ev.clientX, ev.clientY);
+      });
+      miniCanvas.addEventListener('touchstart', function (ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        if (ev.touches.length > 0) handleMinimapClick(ev.touches[0].clientX, ev.touches[0].clientY);
+      }, { passive: false });
+      miniCanvas.addEventListener('touchmove', function (ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        if (ev.touches.length > 0) handleMinimapClick(ev.touches[0].clientX, ev.touches[0].clientY);
+      }, { passive: false });
+    }
+
+    return { findEntityNear, touchToWorld, pinchDist, handleTap, handleLeftClick, handleBoxSelect, handleRightClick, handleMinimapClick };
   }
 
   const exportsObj = { createInputSystem };

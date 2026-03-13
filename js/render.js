@@ -19,7 +19,13 @@
     const myFog = options.myFog || (() => []);
     const tileHash = options.tileHash || (() => 0);
     const drawTile = options.drawTile || (() => {});
-    const drawMinimap = options.drawMinimap || (() => {});
+    const externalDrawMinimap = options.drawMinimap || null;
+    const miniCanvas = options.miniCanvas || null;
+    const mctx = miniCanvas ? miniCanvas.getContext('2d') : null;
+    const TILE_COLORS = options.TILE_COLORS || {
+      0: '#2d5a27', 1: '#7a6a4f', 2: '#1a3a5c',
+      3: '#444', 4: '#1a4a1a', 5: '#3a6a30'
+    };
     const getUnitVisualKey = options.getUnitVisualKey;
     const getProductionTime = options.getProductionTime || ((item, owner) => 20);
     const RESOURCE_COLORS = options.RESOURCE_COLORS || { wood: '#4a8', food: '#aa4', gold: '#da0' };
@@ -328,7 +334,7 @@
       ctx.restore();
 
       // Draw minimap
-      drawMinimap();
+      drawMinimapInternal();
     }
 
     function drawBuilding(e) {
@@ -1101,6 +1107,82 @@
       }
 
       ctx.globalAlpha = 1;
+    }
+
+    function drawMinimapInternal() {
+      // If external callback is provided (HTML wiring), use it
+      if (externalDrawMinimap) { externalDrawMinimap(); return; }
+      // Otherwise use built-in minimap renderer
+      if (!mctx || !G) return;
+      const mw = miniCanvas.width, mh = miniCanvas.height;
+      if (mw === 0 || mh === 0) return;
+      mctx.fillStyle = '#141a22';
+      mctx.fillRect(0, 0, mw, mh);
+      const scaleX = mw / MAP_W, scaleY = mh / MAP_H;
+
+      // Fog source
+      const mmFog = G.isMultiplayer ? myFog() : G.map.fogPlayer;
+      if (!mmFog || !mmFog.length) return;
+
+      // Tiles (sample every 2nd tile for performance)
+      for (let ty = 0; ty < MAP_H; ty += 2) {
+        for (let tx = 0; tx < MAP_W; tx += 2) {
+          const fog = mmFog[ty]?.[tx];
+          if (fog === FOG_UNEXPLORED) continue;
+          const tile = G.map.tiles?.[ty]?.[tx] ?? 0;
+          mctx.fillStyle = fog === FOG_VISIBLE ? (TILE_COLORS[tile] || '#2d5a27') : '#2d3440';
+          mctx.fillRect(tx * scaleX, ty * scaleY, 2 * scaleX, 2 * scaleY);
+          if (fog === FOG_VISIBLE) {
+            mctx.fillStyle = 'rgba(180,255,210,0.08)';
+            mctx.fillRect(tx * scaleX, ty * scaleY, 2 * scaleX, 2 * scaleY);
+          }
+        }
+      }
+
+      // Resources
+      if (G.map.resources) {
+        for (const r of G.map.resources) {
+          if (r.amount <= 0) continue;
+          if (r.type === 'wood' && G.map.tiles?.[r.y]?.[r.x] === 4) continue;
+          const fog = mmFog[r.y]?.[r.x];
+          if (!fog) continue;
+          mctx.fillStyle = RESOURCE_COLORS[r.type] || '#ff0';
+          mctx.fillRect(r.x * scaleX - 1, r.y * scaleY - 1, 3, 3);
+        }
+      }
+
+      // Entities
+      for (const e of G.entities) {
+        if (e.hp <= 0) continue;
+        const etx = Math.floor(e.x / TILE), ety = Math.floor(e.y / TILE);
+        if (e.owner !== myOwner() && mmFog[ety]?.[etx] !== FOG_VISIBLE) continue;
+        mctx.fillStyle = e.owner === myOwner() ? '#0f0' : '#f00';
+        const sz = e.isBuilding ? 3 : 2;
+        mctx.fillRect((e.x / TILE) * scaleX - sz / 2, (e.y / TILE) * scaleY - sz / 2, sz, sz);
+      }
+
+      // Vision rings
+      mctx.strokeStyle = 'rgba(120,255,170,0.16)';
+      mctx.lineWidth = 1;
+      for (const e of G.entities) {
+        if (e.hp <= 0 || e.owner !== myOwner()) continue;
+        const sightTiles = e.isBuilding ? (e.size || 2) * 2 + 4 : e.flying ? 10 : 7;
+        const cx = (e.x / TILE) * scaleX, cy = (e.y / TILE) * scaleY;
+        const radius = sightTiles * ((scaleX + scaleY) / 2);
+        mctx.beginPath();
+        mctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        mctx.stroke();
+      }
+
+      // Camera viewport rectangle
+      const cam = G.camera;
+      const vw = (canvas.width / cam.zoom / TILE) * scaleX;
+      const vh = (canvas.height / cam.zoom / TILE) * scaleY;
+      const vx = (cam.x / TILE) * scaleX;
+      const vy = (cam.y / TILE) * scaleY;
+      mctx.strokeStyle = '#fff';
+      mctx.lineWidth = 1;
+      mctx.strokeRect(vx, vy, vw, vh);
     }
 
     return {
