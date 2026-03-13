@@ -44,7 +44,12 @@ function moveDirectly(e, tx, ty, dt, arrivalRadius = 8) {
   const dx = tx - e.x, dy = ty - e.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
   if (dist < arrivalRadius) return true;
-  const step = e.speed * dt;
+  // Apply slow debuff (e.g., from Void Curse)
+  let speed = e.speed;
+  if (e.slowUntil && G.time < e.slowUntil) {
+    speed *= (e.slowFactor || 0.5);
+  }
+  const step = speed * dt;
   if (step >= dist) {
     const ftx = Math.floor(tx / TILE), fty = Math.floor(ty / TILE);
     if (isPassable(ftx, fty)) { e.x = tx; e.y = ty; return true; }
@@ -73,7 +78,9 @@ function moveToward(e, tx, ty, dt, arrivalRadius = 8) {
 
   // Flying units: straight line (no pathfinding needed)
   if (e.flying) {
-    const step = e.speed * dt;
+    let flySpeed = e.speed;
+    if (e.slowUntil && G.time < e.slowUntil) flySpeed *= (e.slowFactor || 0.5);
+    const step = flySpeed * dt;
     if (step >= fdist || fdist < arrivalRadius) { e.x = tx; e.y = ty; return true; }
     e.x += (fdx / fdist) * step;
     e.y += (fdy / fdist) * step;
@@ -110,7 +117,9 @@ function moveToward(e, tx, ty, dt, arrivalRadius = 8) {
   const wp = e.path[e.pathIndex];
   const dx = wp.x - e.x, dy = wp.y - e.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  const step = e.speed * dt;
+  let pathSpeed = e.speed;
+  if (e.slowUntil && G.time < e.slowUntil) pathSpeed *= (e.slowFactor || 0.5);
+  const step = pathSpeed * dt;
 
   if (dist < step + 6) {
     // Reached waypoint
@@ -139,20 +148,42 @@ function moveToward(e, tx, ty, dt, arrivalRadius = 8) {
 }
 
 function updateUnitSeparation() {
-  return;
+  // Push apart units that overlap, but SKIP friendly-vs-friendly pairs
+  // (friendly units are allowed to stack/overlap freely)
+  const units = [];
+  for (const e of G.entities) {
+    if (e.hp <= 0 || e.isBuilding) continue;
+    units.push(e);
+  }
+  const sepDist = TILE * 0.6;
+  const sepDistSq = sepDist * sepDist;
+  const pushStrength = 1.5;
+  for (let i = 0; i < units.length; i++) {
+    for (let j = i + 1; j < units.length; j++) {
+      const a = units[i], b = units[j];
+      // Skip separation between friendly units
+      if (a.owner === b.owner) continue;
+      // Skip if either is flying (different layer)
+      if (a.flying || b.flying) continue;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < sepDistSq && distSq > 0.01) {
+        const dist = Math.sqrt(distSq);
+        const overlap = sepDist - dist;
+        const pushX = (dx / dist) * overlap * pushStrength * 0.5;
+        const pushY = (dy / dist) * overlap * pushStrength * 0.5;
+        // Push both units apart symmetrically
+        const aTx = Math.floor((a.x - pushX) / TILE);
+        const aTy = Math.floor((a.y - pushY) / TILE);
+        if (isPassable(aTx, aTy)) { a.x -= pushX; a.y -= pushY; }
+        const bTx = Math.floor((b.x + pushX) / TILE);
+        const bTy = Math.floor((b.y + pushY) / TILE);
+        if (isPassable(bTx, bTy)) { b.x += pushX; b.y += pushY; }
+      }
+    }
+  }
 }
 
-function notify(msg, type) {
-  G.notifications.push({ msg, type: type || 'info', time: 3 });
-  const el = document.getElementById('notifications');
-  const div = document.createElement('div');
-  div.className = 'notification notif-' + (type || 'info');
-  div.textContent = msg;
-  el.appendChild(div);
-  setTimeout(() => div.remove(), 3200);
-}
-
-// ---- RENDERING ----
 
     return {
       getInteractionPoint(...args) { G = getGame(); return getInteractionPoint(...args); },

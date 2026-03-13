@@ -125,6 +125,13 @@
       target.hp -= dmg;
       target.flash = 0.15;
       target.lastDamageTime = G.time; // Track for out-of-combat regen
+
+      // Void Curse: shadow attacks slow the target
+      if (attacker.owner && G.players[attacker.owner]?.techs?.voidCurse && !target.isBuilding) {
+        target.slowUntil = G.time + 2.5; // 2.5 second slow
+        target.slowFactor = 0.5; // 50% speed reduction
+      }
+
       // Splash
       if (attacker.splash > 0) {
         for (const e of G.entities) {
@@ -175,6 +182,26 @@
     function updateUnit(e, dt) {
       if (e.flash > 0) e.flash -= dt;
       if (e.hp <= 0) return;
+
+      // Stealth logic: units with canStealth cloak when idle/moving, uncloak when attacking
+      if (e.canStealth) {
+        if (e.state === 'attack' || e.state === 'chase') {
+          e.stealthed = false;
+        } else if (!e.stealthed && (e.state === 'idle' || e.state === 'move')) {
+          // Re-cloak after 3 seconds out of combat
+          if (!e.lastDamageTime || G.time - e.lastDamageTime >= 3) {
+            e.stealthed = true;
+          }
+        }
+      }
+
+      // Out-of-combat HP regeneration: units regen 1 HP/s after 10s without damage
+      if (e.hp > 0 && e.hp < e.maxHp && !e.isConstructing) {
+        const lastDmg = e.lastDamageTime || 0;
+        if (G.time - lastDmg >= 10) {
+          e.hp = Math.min(e.maxHp, e.hp + 1 * dt);
+        }
+      }
 
       if (e.isWorker && e.owner === "player") {
         updateWorker(e, dt);
@@ -521,8 +548,12 @@
             e.stateTimer = 0;
             const resType = e.gatherTarget.type;
             const speed = faction.gatherSpeed[resType] || 5;
+            const goldBonus =
+              resType === "gold" && G.players[e.owner].techs.goldGather
+                ? G.players[e.owner].techs.goldGather
+                : 0;
             const amt = Math.min(
-              speed,
+              speed * (1 + goldBonus),
               e.gatherTarget.amount,
               maxLoad - e.carrying,
             );
@@ -635,21 +666,32 @@
       if (e.hp <= 0) return;
       if (e.isConstructing) return; // under construction
 
+      // Out-of-combat HP regeneration for buildings: 2 HP/s after 30s
+      if (e.hp < e.maxHp) {
+        const lastDmg = e.lastDamageTime || 0;
+        if (G.time - lastDmg >= 30) {
+          e.hp = Math.min(e.maxHp, e.hp + 2 * dt);
+        }
+      }
+
       // Tower attack
       if (e.towerAtk > 0) {
         if (e.atkCooldown > 0) e.atkCooldown -= dt;
         if (e.atkCooldown <= 0) {
           const enemy = findNearestEnemy(e, e.towerRange);
           if (enemy) {
+            // Create a pseudo-attacker for calcDamage using tower stats
+            const towerAttacker = { atk: e.towerAtk, dmgType: e.towerDmgType || 'pierce', splash: 0 };
+            const dmg = calcDamage(towerAttacker, enemy);
             G.projectiles.push({
               x: e.x,
               y: e.y,
               targetId: enemy.id,
               speed: 350,
-              dmg: e.towerAtk,
+              dmg,
               owner: e.owner,
               color: e.owner === myOwner() ? "#fa0" : "#f55",
-              ptype: "pierce",
+              ptype: towerAttacker.dmgType,
               prevX: e.x,
               prevY: e.y,
             });

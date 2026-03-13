@@ -146,6 +146,21 @@
         aiBuildBuilding("supply", ep, enemyBase, 6);
       }
 
+      // Build harvester (resource drop-off) to expand economy
+      if (
+        !enemyBuildings.find((b) => b.key === "harvester") &&
+        G.time > 60
+      ) {
+        aiBuildBuilding("harvester", ep, enemyBase, 7);
+      }
+      // Build a second harvester later for expansion
+      if (
+        enemyBuildings.filter((b) => b.key === "harvester").length < 2 &&
+        G.time > 240
+      ) {
+        aiBuildBuilding("harvester", ep, enemyBase, 12);
+      }
+
       // Build barracks
       const barracks = enemyBuildings.filter((b) => b.key === "barracks");
       if (barracks.length < 2) {
@@ -196,11 +211,16 @@
         const techKey = chooseResearchTech(ep, TECHS);
         if (techKey) {
           const tech = TECHS[techKey];
-          ep.resources.wood -= tech.costW;
-          ep.resources.food -= tech.costF;
-          ep.resources.gold -= tech.costG;
-          researchLab.researchItem = techKey;
-          researchLab.researchTimer = 0;
+          // Double-check resource availability before deducting
+          if (ep.resources.wood >= tech.costW &&
+              ep.resources.food >= tech.costF &&
+              ep.resources.gold >= tech.costG) {
+            ep.resources.wood -= tech.costW;
+            ep.resources.food -= tech.costF;
+            ep.resources.gold -= tech.costG;
+            researchLab.researchItem = techKey;
+            researchLab.researchTimer = 0;
+          }
         }
       }
 
@@ -221,10 +241,15 @@
                 Math.floor(Math.random() * Math.min(queueableKeys.length, 2))
               ];
             const u = faction.units[key];
-            bk.productionQueue.push({ key, isWorker: false });
-            ep.resources.wood -= u.costW || 0;
-            ep.resources.food -= u.costF || 0;
-            ep.resources.gold -= u.costG || 0;
+            // Verify resources are still sufficient before deducting
+            if (ep.resources.wood >= (u.costW || 0) &&
+                ep.resources.food >= (u.costF || 0) &&
+                ep.resources.gold >= (u.costG || 0)) {
+              bk.productionQueue.push({ key, isWorker: false });
+              ep.resources.wood -= u.costW || 0;
+              ep.resources.food -= u.costF || 0;
+              ep.resources.gold -= u.costG || 0;
+            }
           }
         }
       }
@@ -248,10 +273,14 @@
           const key =
             queueableKeys[Math.floor(Math.random() * queueableKeys.length)];
           const u = faction.units[key];
-          workshop.productionQueue.push({ key, isWorker: false });
-          ep.resources.wood -= u.costW || 0;
-          ep.resources.food -= u.costF || 0;
-          ep.resources.gold -= u.costG || 0;
+          if (ep.resources.wood >= (u.costW || 0) &&
+              ep.resources.food >= (u.costF || 0) &&
+              ep.resources.gold >= (u.costG || 0)) {
+            workshop.productionQueue.push({ key, isWorker: false });
+            ep.resources.wood -= u.costW || 0;
+            ep.resources.food -= u.costF || 0;
+            ep.resources.gold -= u.costG || 0;
+          }
         }
       }
 
@@ -273,10 +302,14 @@
           const key =
             queueableKeys[Math.floor(Math.random() * queueableKeys.length)];
           const u = faction.units[key];
-          magetower.productionQueue.push({ key, isWorker: false });
-          ep.resources.wood -= u.costW || 0;
-          ep.resources.food -= u.costF || 0;
-          ep.resources.gold -= u.costG || 0;
+          if (ep.resources.wood >= (u.costW || 0) &&
+              ep.resources.food >= (u.costF || 0) &&
+              ep.resources.gold >= (u.costG || 0)) {
+            magetower.productionQueue.push({ key, isWorker: false });
+            ep.resources.wood -= u.costW || 0;
+            ep.resources.food -= u.costF || 0;
+            ep.resources.gold -= u.costG || 0;
+          }
         }
       }
 
@@ -298,10 +331,14 @@
           const key =
             queueableKeys[Math.floor(Math.random() * queueableKeys.length)];
           const u = faction.units[key];
-          airfield.productionQueue.push({ key, isWorker: false });
-          ep.resources.wood -= u.costW || 0;
-          ep.resources.food -= u.costF || 0;
-          ep.resources.gold -= u.costG || 0;
+          if (ep.resources.wood >= (u.costW || 0) &&
+              ep.resources.food >= (u.costF || 0) &&
+              ep.resources.gold >= (u.costG || 0)) {
+            airfield.productionQueue.push({ key, isWorker: false });
+            ep.resources.wood -= u.costW || 0;
+            ep.resources.food -= u.costF || 0;
+            ep.resources.gold -= u.costG || 0;
+          }
         }
       }
 
@@ -324,10 +361,14 @@
           const key =
             queueableKeys[Math.floor(Math.random() * queueableKeys.length)];
           const u = faction.units[key];
-          ultimate.productionQueue.push({ key, isWorker: false });
-          ep.resources.wood -= u.costW || 0;
-          ep.resources.food -= u.costF || 0;
-          ep.resources.gold -= u.costG || 0;
+          if (ep.resources.wood >= (u.costW || 0) &&
+              ep.resources.food >= (u.costF || 0) &&
+              ep.resources.gold >= (u.costG || 0)) {
+            ultimate.productionQueue.push({ key, isWorker: false });
+            ep.resources.wood -= u.costW || 0;
+            ep.resources.food -= u.costF || 0;
+            ep.resources.gold -= u.costG || 0;
+          }
         }
       }
 

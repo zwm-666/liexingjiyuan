@@ -21,6 +21,8 @@
     const drawTile = options.drawTile || (() => {});
     const drawMinimap = options.drawMinimap || (() => {});
     const getUnitVisualKey = options.getUnitVisualKey;
+    const getProductionTime = options.getProductionTime || ((item, owner) => 20);
+    const RESOURCE_COLORS = options.RESOURCE_COLORS || { wood: '#4a8', food: '#aa4', gold: '#da0' };
     const SpriteLoader = (typeof window !== 'undefined' ? window.RSESpriteLoader : null);
 
     function getEntityFaction(e) {
