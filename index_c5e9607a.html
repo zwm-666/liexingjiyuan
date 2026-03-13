@@ -1158,6 +1158,7 @@
         </div>
 
         <script src="js/game-data.js"></script>
+        <script src="js/sprite-loader.js"></script>
         <script src="js/entity-factory.js"></script>
         <script src="js/ai-logic.js"></script>
         <script src="js/render-logic.js"></script>
@@ -1197,6 +1198,17 @@
             // ---- STATIC GAME DATA ----
             const { FACTIONS, BUILDINGS, TECHS, UNIT_VISUAL } =
                 window.RSEGameData;
+            // ---- PRELOAD SPRITES ----
+            if (window.RSESpriteLoader) {
+                window.RSESpriteLoader.loadAllSprites(
+                    function(loaded, total) {
+                        console.log('[Sprites] Loading: ' + loaded + '/' + total);
+                    },
+                    function() {
+                        console.log('[Sprites] All sprites loaded!');
+                    }
+                );
+            }
             const { chooseResearchTech, getTrainableUnitKeys } =
                 window.RSEAiLogic;
             const {

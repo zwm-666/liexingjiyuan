@@ -21,6 +21,13 @@
     const drawTile = options.drawTile || (() => {});
     const drawMinimap = options.drawMinimap || (() => {});
     const getUnitVisualKey = options.getUnitVisualKey;
+    const SpriteLoader = (typeof window !== 'undefined' ? window.RSESpriteLoader : null);
+
+    function getEntityFaction(e) {
+      if (!G || !G.players) return null;
+      const p = G.players[e.owner];
+      return p ? p.faction : null;
+    }
 
     function render() {
       if (!G || G.phase === "menu") return;
@@ -358,7 +365,21 @@
       );
       ctx.fill();
 
-      if (e.key === "base") {
+      // Try sprite rendering first
+      const faction = getEntityFaction(e);
+      const sprite = SpriteLoader && faction ? SpriteLoader.getBuildingSprite(faction, e.key) : null;
+      if (sprite) {
+        if (flash) {
+          ctx.globalAlpha = alpha * 0.6;
+          ctx.drawImage(sprite, bx, by, size, size);
+          ctx.globalAlpha = alpha * 0.4;
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(bx, by, size, size);
+          ctx.globalAlpha = alpha;
+        } else {
+          ctx.drawImage(sprite, bx, by, size, size);
+        }
+      } else if (e.key === "base") {
         // Castle base
         ctx.fillStyle = flash ? "#fff" : "#5a5565";
         ctx.fillRect(bx + 4, by + 12, size - 8, size - 16);
@@ -739,7 +760,27 @@
       const ux = e.x,
         uy = drawY;
 
-      if (vis === "worker") {
+      // Try sprite rendering first
+      const faction = getEntityFaction(e);
+      const unitKey = e.isWorker ? 'worker' : e.key;
+      const unitSprite = SpriteLoader && faction ? SpriteLoader.getUnitSprite(faction, unitKey) : null;
+      if (unitSprite) {
+        const sw = unitSprite.naturalWidth || unitSprite.width;
+        const sh = unitSprite.naturalHeight || unitSprite.height;
+        const drawSize = Math.max(sw, sh, 24);
+        if (flash) {
+          ctx.globalAlpha = stealthAlpha * 0.6;
+          ctx.drawImage(unitSprite, ux - drawSize / 2, uy - drawSize / 2, drawSize, drawSize);
+          ctx.globalAlpha = stealthAlpha * 0.4;
+          ctx.fillStyle = "#fff";
+          ctx.beginPath();
+          ctx.arc(ux, uy, drawSize / 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = stealthAlpha;
+        } else {
+          ctx.drawImage(unitSprite, ux - drawSize / 2, uy - drawSize / 2, drawSize, drawSize);
+        }
+      } else if (vis === "worker") {
         // Small humanoid
         ctx.fillStyle = flash ? "#fff" : fc;
         ctx.beginPath();
