@@ -5742,6 +5742,7 @@
                 document.getElementById("game-container").style.display =
                     "block";
                 document.getElementById("game-over").style.display = "none";
+                resizeCanvas();
 
                 lastTime = performance.now();
             }
@@ -5829,7 +5830,7 @@
                 document.getElementById("game-container").style.display =
                     "block";
                 document.getElementById("game-over").style.display = "none";
-                // Show multiplayer indicator
+                resizeCanvas();
                 const ind = document.getElementById("mp-indicator");
                 ind.classList.add("show");
                 const myColor = FACTIONS[myFaction].color;
