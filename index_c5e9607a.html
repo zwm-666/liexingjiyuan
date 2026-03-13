@@ -2163,20 +2163,35 @@
                 );
 
                 // ---- RESOURCES ----
-                // Every forest tile = harvestable wood (small per tile, large in aggregate)
-                for (let y = 0; y < H; y++)
-                    for (let x = 0; x < W; x++) {
-                        if (tiles[y][x] === 4) {
-                            resources.push({
-                                type: "wood",
-                                x,
-                                y,
-                                amount: 120,
-                                max: 120,
-                                regen: 0.3,
-                            });
+                // Strategic wood clusters (not every forest tile)
+                function placeWoodCluster(cx, cy, radius) {
+                    for (let dy = -radius; dy <= radius; dy++)
+                        for (let dx = -radius; dx <= radius; dx++) {
+                            const wx = cx + dx, wy = cy + dy;
+                            if (wx < 0 || wx >= W || wy < 0 || wy >= H) continue;
+                            if (tiles[wy][wx] !== 4) continue;
+                            resources.push({ type: "wood", x: wx, y: wy, amount: 150, max: 150, regen: 0.1 });
                         }
-                    }
+                }
+                // Player 1 base (~12,12) nearby clusters
+                placeWoodCluster(8, 20, 3);
+                placeWoodCluster(20, 8, 3);
+                placeWoodCluster(22, 22, 3);
+                // Player 2 base (~W-12,H-12) nearby clusters
+                placeWoodCluster(W - 9, H - 21, 3);
+                placeWoodCluster(W - 21, H - 9, 3);
+                placeWoodCluster(W - 23, H - 23, 3);
+                // Expansion areas
+                placeWoodCluster(Math.floor(W * 0.3), Math.floor(H * 0.3), 3);
+                placeWoodCluster(Math.floor(W * 0.7), Math.floor(H * 0.7), 3);
+                // Center contested
+                placeWoodCluster(Math.floor(W / 2) - 8, Math.floor(H / 2), 3);
+                placeWoodCluster(Math.floor(W / 2) + 8, Math.floor(H / 2), 3);
+                // Flanks
+                placeWoodCluster(Math.floor(W * 0.2), Math.floor(H * 0.5), 2);
+                placeWoodCluster(Math.floor(W * 0.8), Math.floor(H * 0.5), 2);
+                placeWoodCluster(Math.floor(W * 0.5), Math.floor(H * 0.2), 2);
+                placeWoodCluster(Math.floor(W * 0.5), Math.floor(H * 0.8), 2);
 
                 // Food patches: 4-tile (2x2) clusters near starting areas and expansions
                 function placeFood(cx, cy) {
@@ -2204,7 +2219,7 @@
                                 y: fy,
                                 amount: 1500,
                                 max: 1500,
-                                regen: 0.5,
+                                regen: 0,
                             });
                         }
                     }
@@ -2238,7 +2253,7 @@
                             y: gy,
                             amount: amt,
                             max: amt,
-                            regen: 0.02,
+                            regen: 0,
                         });
                     }
                 }
@@ -2729,11 +2744,13 @@
                         ) {
                             e.state = "gathering";
                             e.stateTimer = 0;
+                            if (e.gatherTarget) e.gatherTarget._beingGathered = true;
                         }
                         break;
                     case "gathering":
                         if (!e.gatherTarget || e.gatherTarget.amount <= 0) {
                             // Resource depleted — find nearest resource of same type
+                            if (e.gatherTarget) e.gatherTarget._beingGathered = false;
                             const depletedType = e.gatherTarget
                                 ? e.gatherTarget.type
                                 : null;
@@ -2785,6 +2802,7 @@
                                 e.carrying >= maxLoad ||
                                 e.gatherTarget.amount <= 0
                             ) {
+                                if (e.gatherTarget) e.gatherTarget._beingGathered = false;
                                 e.state = "returning";
                             }
                         }
@@ -2948,10 +2966,12 @@
                         ) {
                             e.state = "gathering";
                             e.stateTimer = 0;
+                            if (e.gatherTarget) e.gatherTarget._beingGathered = true;
                         }
                         break;
                     case "gathering":
                         if (!e.gatherTarget || e.gatherTarget.amount <= 0) {
+                            if (e.gatherTarget) e.gatherTarget._beingGathered = false;
                             const dt2 = e.gatherTarget
                                 ? e.gatherTarget.type
                                 : null;
@@ -2995,8 +3015,10 @@
                             if (
                                 e.carrying >= maxLoad ||
                                 e.gatherTarget.amount <= 0
-                            )
+                            ) {
+                                if (e.gatherTarget) e.gatherTarget._beingGathered = false;
                                 e.state = "returning";
+                            }
                         }
                         break;
                     case "returning":
@@ -5589,9 +5611,9 @@
                         }
                     }
 
-                    // Resource regeneration (wood/food fast, gold very slow)
+                    // Resource regeneration (only wood, skip if being gathered)
                     for (const r of G.map.resources) {
-                        if (r.regen && r.amount < r.max) {
+                        if (r.regen && r.amount < r.max && !r._beingGathered) {
                             r.amount = Math.min(r.max, r.amount + r.regen * dt);
                             // Restore forest tile when wood regrows from 0
                             if (
@@ -5614,18 +5636,6 @@
 
                     // Update fog every 10 frames
                     if (Math.floor(G.time * 60) % 10 === 0) updateFog();
-
-                    // Resource regeneration (very slow)
-                    for (const r of G.map.resources) {
-                        if (r.amount < r.max) {
-                            const rate = r.type === "gold" ? 0.08 : 0.8;
-                            r.amount = Math.min(r.max, r.amount + rate * dt);
-                        }
-                        if (G.map.resourceBlocked?.[r.y]) {
-                            G.map.resourceBlocked[r.y][r.x] =
-                                r.amount > 0 ? 1 : 0;
-                        }
-                    }
                 }
 
                 render();

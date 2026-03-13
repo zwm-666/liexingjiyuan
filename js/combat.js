@@ -349,11 +349,13 @@
           if (moveToward(e, resourceTarget.x, resourceTarget.y, dt, 10)) {
             e.state = "gathering";
             e.stateTimer = 0;
+            if (e.gatherTarget) e.gatherTarget._beingGathered = true;
           }
           break;
         case "gathering":
           if (!e.gatherTarget || e.gatherTarget.amount <= 0) {
             // Resource depleted — find nearest resource of same type
+            if (e.gatherTarget) e.gatherTarget._beingGathered = false;
             const depletedType = e.gatherTarget ? e.gatherTarget.type : null;
             const nextRes = depletedType
               ? findNearestResource(e, depletedType)
@@ -399,6 +401,7 @@
                 G.map.tiles[ry][rx] = 1;
             }
             if (e.carrying >= maxLoad || e.gatherTarget.amount <= 0) {
+              if (e.gatherTarget) e.gatherTarget._beingGathered = false;
               e.state = "returning";
             }
           }
@@ -526,10 +529,12 @@
           ) {
             e.state = "gathering";
             e.stateTimer = 0;
+            if (e.gatherTarget) e.gatherTarget._beingGathered = true;
           }
           break;
         case "gathering":
           if (!e.gatherTarget || e.gatherTarget.amount <= 0) {
+            if (e.gatherTarget) e.gatherTarget._beingGathered = false;
             const dt2 = e.gatherTarget ? e.gatherTarget.type : null;
             const nr = dt2
               ? findNearestResource(e, dt2)
@@ -572,8 +577,10 @@
               if (G.map.tiles[ary] && G.map.tiles[ary][arx] === 4)
                 G.map.tiles[ary][arx] = 1;
             }
-            if (e.carrying >= maxLoad || e.gatherTarget.amount <= 0)
+            if (e.carrying >= maxLoad || e.gatherTarget.amount <= 0) {
+              if (e.gatherTarget) e.gatherTarget._beingGathered = false;
               e.state = "returning";
+            }
           }
           break;
         case "returning":

@@ -305,12 +305,31 @@
       G.map.fogPlayer = Array.from({ length: H }, () => new Uint8Array(W).fill(FOG_UNEXPLORED));
       G.map.fogEnemy = Array.from({ length: H }, () => new Uint8Array(W).fill(FOG_UNEXPLORED));
 
-      // Resources: every forest tile = harvestable wood
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W; x++) {
-          if (tiles[y][x] === 4)
-            resources.push({ type: 'wood', x, y, amount: 120, max: 120, regen: 0.3 });
-        }
+      // Strategic wood clusters (not every forest tile)
+      function placeWoodCluster(cx, cy, radius) {
+        for (let dy = -radius; dy <= radius; dy++)
+          for (let dx = -radius; dx <= radius; dx++) {
+            const wx = cx + dx, wy = cy + dy;
+            if (wx < 0 || wx >= W || wy < 0 || wy >= H) continue;
+            if (tiles[wy][wx] !== 4) continue;
+            resources.push({ type: 'wood', x: wx, y: wy, amount: 150, max: 150, regen: 0.1 });
+          }
+      }
+      // Player 1 base nearby
+      placeWoodCluster(8, 20, 3); placeWoodCluster(20, 8, 3); placeWoodCluster(22, 22, 3);
+      // Player 2 base nearby
+      placeWoodCluster(W-9, H-21, 3); placeWoodCluster(W-21, H-9, 3); placeWoodCluster(W-23, H-23, 3);
+      // Expansion areas
+      placeWoodCluster(Math.floor(W*0.3), Math.floor(H*0.3), 3);
+      placeWoodCluster(Math.floor(W*0.7), Math.floor(H*0.7), 3);
+      // Center contested
+      placeWoodCluster(Math.floor(W/2)-8, Math.floor(H/2), 3);
+      placeWoodCluster(Math.floor(W/2)+8, Math.floor(H/2), 3);
+      // Flanks
+      placeWoodCluster(Math.floor(W*0.2), Math.floor(H*0.5), 2);
+      placeWoodCluster(Math.floor(W*0.8), Math.floor(H*0.5), 2);
+      placeWoodCluster(Math.floor(W*0.5), Math.floor(H*0.2), 2);
+      placeWoodCluster(Math.floor(W*0.5), Math.floor(H*0.8), 2);
 
       // Food patches (2x2 clusters)
       function placeFood(cx, cy) {
@@ -319,7 +338,7 @@
           const fx = cx + ddx, fy = cy + ddy;
           if (fx > 2 && fx < W - 2 && fy > 2 && fy < H - 2 && tiles[fy][fx] !== 2 && tiles[fy][fx] !== 3) {
             tiles[fy][fx] = 0;
-            resources.push({ type: 'food', x: fx, y: fy, amount: 1500, max: 1500, regen: 0.5 });
+            resources.push({ type: 'food', x: fx, y: fy, amount: 1500, max: 1500, regen: 0 });
           }
         }
       }
@@ -334,7 +353,7 @@
       function placeGold(gx, gy, amt) {
         if (gx > 2 && gx < W - 2 && gy > 2 && gy < H - 2 && tiles[gy][gx] !== 2) {
           tiles[gy][gx] = 1;
-          resources.push({ type: 'gold', x: gx, y: gy, amount: amt, max: amt, regen: 0.02 });
+          resources.push({ type: 'gold', x: gx, y: gy, amount: amt, max: amt, regen: 0 });
         }
       }
       placeGold(18, 12, 6000); placeGold(W - 19, H - 13, 6000);
