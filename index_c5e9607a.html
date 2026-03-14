@@ -211,7 +211,7 @@
             /* Bottom panel */
             #bottom-panel {
                 position: absolute;
-                bottom: 0;
+                bottom: 14px;
                 left: 0;
                 right: 0;
                 height: 160px;
@@ -1158,6 +1158,7 @@
         </div>
 
         <script src="js/game-data.js"></script>
+        <script src="js/hud-layout.js"></script>
         <script src="js/sprite-loader.js"></script>
         <script src="js/entity-factory.js"></script>
         <script src="js/ai-logic.js"></script>
@@ -1200,23 +1201,25 @@
                 window.RSEGameData;
             // ---- PRELOAD SPRITES ----
             if (window.RSESpriteLoader) {
-                var startBtn = document.getElementById('start-btn');
+                var startBtn = document.getElementById("start-btn");
                 var originalText = startBtn.textContent;
-                startBtn.textContent = '加载素材中...';
+                startBtn.textContent = "加载素材中...";
                 startBtn.disabled = true;
-                startBtn.style.opacity = '0.6';
+                startBtn.style.opacity = "0.6";
                 window.RSESpriteLoader.loadAllSprites(
-                    function(loaded, total) {
-                        var pct = Math.round(loaded / total * 100);
-                        startBtn.textContent = '加载素材 ' + pct + '%';
-                        console.log('[Sprites] Loading: ' + loaded + '/' + total);
+                    function (loaded, total) {
+                        var pct = Math.round((loaded / total) * 100);
+                        startBtn.textContent = "加载素材 " + pct + "%";
+                        console.log(
+                            "[Sprites] Loading: " + loaded + "/" + total,
+                        );
                     },
-                    function() {
+                    function () {
                         startBtn.textContent = originalText;
                         startBtn.disabled = false;
-                        startBtn.style.opacity = '1';
-                        console.log('[Sprites] All sprites loaded!');
-                    }
+                        startBtn.style.opacity = "1";
+                        console.log("[Sprites] All sprites loaded!");
+                    },
                 );
             }
             const { chooseResearchTech, getTrainableUnitKeys } =
@@ -1926,366 +1929,17 @@
 
             // ---- MAP GENERATION ----
             function generateMap() {
-                const tiles = [];
-                const resources = [];
-                const rng = G.rng;
-                const W = MAP_W,
-                    H = MAP_H;
-
-                // Helper: improved 2D noise (multi-octave)
-                function fbm(x, y) {
-                    return (
-                        noise2D(x, y) * 0.5 +
-                        noise2D(x * 2.1, y * 2.1) * 0.3 +
-                        noise2D(x * 4.3, y * 4.3) * 0.2
-                    );
+                const worldApi = window.RSEWorld?.createWorldSystem({
+                    getGame: () => G,
+                    TILE,
+                    MAP_W,
+                    MAP_H,
+                    FOG_UNEXPLORED,
+                });
+                if (!worldApi || typeof worldApi.generateMap !== "function") {
+                    throw new Error("World system unavailable");
                 }
-
-                // Terrain: 0=grass, 1=dirt, 2=water, 3=cliff, 4=forest, 5=highground
-                for (let y = 0; y < H; y++) {
-                    tiles[y] = [];
-                    for (let x = 0; x < W; x++) {
-                        tiles[y][x] = 0; // default grass
-                    }
-                }
-
-                // ---- Water: edges + lakes + river ----
-                for (let y = 0; y < H; y++)
-                    for (let x = 0; x < W; x++) {
-                        if (x < 2 || x >= W - 2 || y < 2 || y >= H - 2) {
-                            tiles[y][x] = 2;
-                            continue;
-                        }
-                        // Organic edge water
-                        if (x < 4 || x >= W - 4 || y < 4 || y >= H - 4) {
-                            if (noise2D(x * 0.15, y * 0.15) > 0.35)
-                                tiles[y][x] = 2;
-                        }
-                    }
-
-                // Central river (diagonal, StarCraft-style divider)
-                const riverCx = W / 2,
-                    riverCy = H / 2;
-                for (let y = 4; y < H - 4; y++)
-                    for (let x = 4; x < W - 4; x++) {
-                        // River runs from top-right to bottom-left
-                        const riverLine = x - riverCx + (y - riverCy) * 0.6;
-                        const riverWidth =
-                            2.5 + noise2D(x * 0.05, y * 0.05) * 2;
-                        if (
-                            Math.abs(riverLine) < riverWidth &&
-                            y > 20 &&
-                            y < H - 20 &&
-                            x > 15 &&
-                            x < W - 15
-                        ) {
-                            tiles[y][x] = 2;
-                        }
-                    }
-
-                // River crossing bridges (passable dirt paths)
-                const bridgeY1 = Math.floor(H * 0.35),
-                    bridgeY2 = Math.floor(H * 0.65);
-                for (let dy = -1; dy <= 1; dy++)
-                    for (let dx = -3; dx <= 3; dx++) {
-                        const bx1 = Math.floor(W / 2 - bridgeY1 * 0.3) + dx;
-                        if (bx1 > 3 && bx1 < W - 3)
-                            tiles[bridgeY1 + dy][bx1] = 1;
-                        const bx2 =
-                            Math.floor(W / 2 - (bridgeY2 - H) * 0.3 + H * 0.3) +
-                            dx;
-                        if (bx2 > 3 && bx2 < W - 3)
-                            tiles[bridgeY2 + dy][bx2] = 1;
-                    }
-
-                // Small lakes
-                const numLakes = 2 + Math.floor(rng() * 3);
-                for (let i = 0; i < numLakes; i++) {
-                    const lx = 15 + Math.floor(rng() * (W - 30));
-                    const ly = 15 + Math.floor(rng() * (H - 30));
-                    const lr = 3 + Math.floor(rng() * 4);
-                    // Don't place lakes on starting areas
-                    if ((lx < 25 && ly < 25) || (lx > W - 25 && ly > H - 25))
-                        continue;
-                    for (let dy = -lr; dy <= lr; dy++)
-                        for (let dx = -lr; dx <= lr; dx++) {
-                            if (dx * dx + dy * dy <= lr * lr + rng() * 4) {
-                                const tx = lx + dx,
-                                    ty = ly + dy;
-                                if (
-                                    tx > 3 &&
-                                    tx < W - 3 &&
-                                    ty > 3 &&
-                                    ty < H - 3
-                                )
-                                    tiles[ty][tx] = 2;
-                            }
-                        }
-                }
-
-                // ---- Cliff walls: natural barriers with gaps ----
-                // West side cliff wall
-                for (let y = 25; y < 45; y++) {
-                    for (let dx = 0; dx < 3; dx++) {
-                        const cx =
-                            Math.floor(W * 0.32) +
-                            dx +
-                            Math.floor(noise2D(y * 0.2, 1) * 2);
-                        if (cx > 3 && cx < W - 3 && tiles[y][cx] !== 2)
-                            tiles[y][cx] = 3;
-                    }
-                }
-                // East side cliff wall
-                for (let y = H - 45; y < H - 25; y++) {
-                    for (let dx = 0; dx < 3; dx++) {
-                        const cx =
-                            Math.floor(W * 0.68) +
-                            dx +
-                            Math.floor(noise2D(y * 0.2, 2) * 2);
-                        if (cx > 3 && cx < W - 3 && tiles[y][cx] !== 2)
-                            tiles[y][cx] = 3;
-                    }
-                }
-
-                // ---- High ground: plateaus near center ----
-                // Two elevated plateaus flanking the river
-                const hgAreas = [
-                    {
-                        cx: Math.floor(W * 0.35),
-                        cy: Math.floor(H * 0.35),
-                        rx: 8,
-                        ry: 6,
-                    },
-                    {
-                        cx: Math.floor(W * 0.65),
-                        cy: Math.floor(H * 0.65),
-                        rx: 8,
-                        ry: 6,
-                    },
-                    {
-                        cx: Math.floor(W * 0.5),
-                        cy: Math.floor(H * 0.5),
-                        rx: 5,
-                        ry: 5,
-                    },
-                ];
-                for (const hg of hgAreas) {
-                    for (let dy = -hg.ry; dy <= hg.ry; dy++)
-                        for (let dx = -hg.rx; dx <= hg.rx; dx++) {
-                            const dist =
-                                (dx * dx) / (hg.rx * hg.rx) +
-                                (dy * dy) / (hg.ry * hg.ry);
-                            if (dist < 0.9) {
-                                const tx = hg.cx + dx,
-                                    ty = hg.cy + dy;
-                                if (
-                                    tx > 3 &&
-                                    tx < W - 3 &&
-                                    ty > 3 &&
-                                    ty < H - 3 &&
-                                    tiles[ty][tx] === 0
-                                )
-                                    tiles[ty][tx] = 5;
-                            }
-                        }
-                }
-
-                // ---- Dirt paths: roads between bases ----
-                // Main path from top-left to bottom-right
-                for (let i = 0; i < 200; i++) {
-                    const t = i / 200;
-                    const px = Math.floor(
-                        12 + t * (W - 24) + Math.sin(t * 6) * 8,
-                    );
-                    const py = Math.floor(
-                        12 + t * (H - 24) + Math.cos(t * 5) * 6,
-                    );
-                    for (let dy = -1; dy <= 1; dy++)
-                        for (let dx = -1; dx <= 1; dx++) {
-                            const tx = px + dx,
-                                ty = py + dy;
-                            if (
-                                tx > 3 &&
-                                tx < W - 3 &&
-                                ty > 3 &&
-                                ty < H - 3 &&
-                                tiles[ty][tx] === 0
-                            )
-                                tiles[ty][tx] = 1;
-                        }
-                }
-
-                // ---- Base areas: clear space for starting positions ----
-                // Player (top-left) and enemy (bottom-right) clear grass
-                for (let dy = -10; dy <= 10; dy++)
-                    for (let dx = -10; dx <= 10; dx++) {
-                        const px = 10 + dx,
-                            py = 10 + dy;
-                        const ex = W - 11 + dx,
-                            ey = H - 11 + dy;
-                        if (px > 1 && px < W - 2 && py > 1 && py < H - 2) {
-                            if (tiles[py][px] !== 2)
-                                tiles[py][px] =
-                                    dx * dx + dy * dy < 64
-                                        ? 0
-                                        : tiles[py][px] === 4
-                                          ? 4
-                                          : 0;
-                        }
-                        if (ex > 1 && ex < W - 2 && ey > 1 && ey < H - 2) {
-                            if (tiles[ey][ex] !== 2)
-                                tiles[ey][ex] =
-                                    dx * dx + dy * dy < 64
-                                        ? 0
-                                        : tiles[ey][ex] === 4
-                                          ? 4
-                                          : 0;
-                        }
-                    }
-
-                // ---- Forest: clusters using noise (all harvestable) ----
-                for (let y = 4; y < H - 4; y++)
-                    for (let x = 4; x < W - 4; x++) {
-                        if (tiles[y][x] !== 0) continue; // Only on grass
-                        const n = fbm(x * 0.06, y * 0.06);
-                        // Skip base areas
-                        if ((x < 18 && y < 18) || (x > W - 18 && y > H - 18))
-                            continue;
-                        if (n > 0.52) tiles[y][x] = 4;
-                    }
-
-                // Fog
-                G.map.fogPlayer = Array.from({ length: H }, () =>
-                    new Uint8Array(W).fill(FOG_UNEXPLORED),
-                );
-                G.map.fogEnemy = Array.from({ length: H }, () =>
-                    new Uint8Array(W).fill(FOG_UNEXPLORED),
-                );
-
-                // ---- RESOURCES ----
-                // Strategic wood clusters (not every forest tile)
-                function placeWoodCluster(cx, cy, radius) {
-                    for (let dy = -radius; dy <= radius; dy++)
-                        for (let dx = -radius; dx <= radius; dx++) {
-                            const wx = cx + dx, wy = cy + dy;
-                            if (wx < 0 || wx >= W || wy < 0 || wy >= H) continue;
-                            if (tiles[wy][wx] !== 4) continue;
-                            resources.push({ type: "wood", x: wx, y: wy, amount: 150, max: 150, regen: 0.1 });
-                        }
-                }
-                const woodClusters = [
-                    // Player 1 base nearby
-                    [8, 20, 2],
-                    [20, 8, 2],
-                    // Player 2 base nearby
-                    [W - 9, H - 21, 2],
-                    [W - 21, H - 9, 2],
-                    // Expansion areas
-                    [Math.floor(W * 0.3), Math.floor(H * 0.3), 2],
-                    [Math.floor(W * 0.7), Math.floor(H * 0.7), 2],
-                    // Center contested
-                    [Math.floor(W / 2) - 8, Math.floor(H / 2), 2],
-                    [Math.floor(W / 2) + 8, Math.floor(H / 2), 2],
-                    // Thinner vertical side income
-                    [Math.floor(W * 0.5), Math.floor(H * 0.2), 1],
-                    [Math.floor(W * 0.5), Math.floor(H * 0.8), 1],
-                ];
-                for (const [cx, cy, radius] of woodClusters) {
-                    placeWoodCluster(cx, cy, radius);
-                }
-
-                // Food patches: 4-tile (2x2) clusters near starting areas and expansions
-                function placeFood(cx, cy) {
-                    const offsets = [
-                        [0, 0],
-                        [1, 0],
-                        [0, 1],
-                        [1, 1],
-                    ];
-                    for (const [dx, dy] of offsets) {
-                        const fx = cx + dx,
-                            fy = cy + dy;
-                        if (
-                            fx > 2 &&
-                            fx < W - 2 &&
-                            fy > 2 &&
-                            fy < H - 2 &&
-                            tiles[fy][fx] !== 2 &&
-                            tiles[fy][fx] !== 3
-                        ) {
-                            tiles[fy][fx] = 0; // Ensure grass under food
-                            resources.push({
-                                type: "food",
-                                x: fx,
-                                y: fy,
-                                amount: 1500,
-                                max: 1500,
-                                regen: 0,
-                            });
-                        }
-                    }
-                }
-                // Player start food
-                placeFood(14, 6);
-                placeFood(6, 14);
-                // Enemy start food
-                placeFood(W - 16, H - 8);
-                placeFood(W - 8, H - 16);
-                // Natural expansion food (mid-map)
-                placeFood(Math.floor(W * 0.3), Math.floor(H * 0.2));
-                placeFood(Math.floor(W * 0.7), Math.floor(H * 0.8));
-                // Center contested food
-                placeFood(Math.floor(W / 2) - 5, Math.floor(H / 2) - 1);
-                placeFood(Math.floor(W / 2) + 4, Math.floor(H / 2) + 1);
-
-                // Gold mines: 1-tile, rare and valuable
-                function placeGold(gx, gy, amt) {
-                    if (
-                        gx > 2 &&
-                        gx < W - 2 &&
-                        gy > 2 &&
-                        gy < H - 2 &&
-                        tiles[gy][gx] !== 2
-                    ) {
-                        tiles[gy][gx] = 1; // Dirt under gold
-                        resources.push({
-                            type: "gold",
-                            x: gx,
-                            y: gy,
-                            amount: amt,
-                            max: amt,
-                            regen: 0,
-                        });
-                    }
-                }
-                // Player natural gold
-                placeGold(18, 12, 6000);
-                // Enemy natural gold
-                placeGold(W - 19, H - 13, 6000);
-                // Expansion gold
-                placeGold(Math.floor(W * 0.3) + 1, Math.floor(H * 0.25), 5000);
-                placeGold(Math.floor(W * 0.7) - 1, Math.floor(H * 0.75), 5000);
-                // Center contested gold (high value)
-                placeGold(Math.floor(W / 2), Math.floor(H / 2), 10000);
-                // Side golds
-                placeGold(Math.floor(W * 0.2), Math.floor(H * 0.5), 4000);
-                placeGold(Math.floor(W * 0.8), Math.floor(H * 0.5), 4000);
-
-                G.map.tiles = tiles;
-                G.map.resources = resources;
-                G.map.blocked = Array.from(
-                    { length: MAP_H },
-                    () => new Uint8Array(MAP_W),
-                );
-                G.map.resourceBlocked = Array.from(
-                    { length: MAP_H },
-                    () => new Uint8Array(MAP_W),
-                );
-                for (const resource of resources) {
-                    if (resource.amount > 0) {
-                        G.map.resourceBlocked[resource.y][resource.x] = 1;
-                    }
-                }
+                worldApi.generateMap();
             }
 
             function noise2D(x, y) {
@@ -2745,13 +2399,15 @@
                         ) {
                             e.state = "gathering";
                             e.stateTimer = 0;
-                            if (e.gatherTarget) e.gatherTarget._beingGathered = true;
+                            if (e.gatherTarget)
+                                e.gatherTarget._beingGathered = true;
                         }
                         break;
                     case "gathering":
                         if (!e.gatherTarget || e.gatherTarget.amount <= 0) {
                             // Resource depleted — find nearest resource of same type
-                            if (e.gatherTarget) e.gatherTarget._beingGathered = false;
+                            if (e.gatherTarget)
+                                e.gatherTarget._beingGathered = false;
                             const depletedType = e.gatherTarget
                                 ? e.gatherTarget.type
                                 : null;
@@ -2791,7 +2447,8 @@
                                 e.carrying >= maxLoad ||
                                 e.gatherTarget.amount <= 0
                             ) {
-                                if (e.gatherTarget) e.gatherTarget._beingGathered = false;
+                                if (e.gatherTarget)
+                                    e.gatherTarget._beingGathered = false;
                                 e.state = "returning";
                             }
                         }
@@ -2955,12 +2612,14 @@
                         ) {
                             e.state = "gathering";
                             e.stateTimer = 0;
-                            if (e.gatherTarget) e.gatherTarget._beingGathered = true;
+                            if (e.gatherTarget)
+                                e.gatherTarget._beingGathered = true;
                         }
                         break;
                     case "gathering":
                         if (!e.gatherTarget || e.gatherTarget.amount <= 0) {
-                            if (e.gatherTarget) e.gatherTarget._beingGathered = false;
+                            if (e.gatherTarget)
+                                e.gatherTarget._beingGathered = false;
                             const dt2 = e.gatherTarget
                                 ? e.gatherTarget.type
                                 : null;
@@ -2994,7 +2653,8 @@
                                 e.carrying >= maxLoad ||
                                 e.gatherTarget.amount <= 0
                             ) {
-                                if (e.gatherTarget) e.gatherTarget._beingGathered = false;
+                                if (e.gatherTarget)
+                                    e.gatherTarget._beingGathered = false;
                                 e.state = "returning";
                             }
                         }
@@ -3413,7 +3073,8 @@
             }
 
             function cleanupDepletedResource(resource) {
-                if (!resource || resource.amount > 0 || resource.destroyed) return false;
+                if (!resource || resource.amount > 0 || resource.destroyed)
+                    return false;
                 resource.amount = 0;
                 resource.destroyed = true;
                 resource._beingGathered = false;
@@ -3588,6 +3249,30 @@
 
             let RENDER_API = null;
 
+            function applyHudLayout() {
+                const layoutApi = window.RSEHudLayout;
+                if (!layoutApi || typeof layoutApi.getHudLayout !== "function")
+                    return;
+                const layout = layoutApi.getHudLayout({
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                });
+                const bottomPanel = document.getElementById("bottom-panel");
+                const minimapContainer =
+                    document.getElementById("minimap-container");
+                const cmdPanel = document.getElementById("cmd-panel");
+                if (bottomPanel) {
+                    bottomPanel.style.bottom = layout.bottomPanelBottom + "px";
+                    bottomPanel.style.height = layout.bottomPanelHeight + "px";
+                }
+                if (minimapContainer) {
+                    minimapContainer.style.height = layout.minimapHeight + "px";
+                }
+                if (cmdPanel) {
+                    cmdPanel.style.padding = layout.cmdPanelPadding + "px";
+                }
+            }
+
             function refreshRenderApi() {
                 RENDER_API = window.RSERender.createRenderSystem({
                     getGame: () => G,
@@ -3616,6 +3301,7 @@
             function resizeCanvas() {
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
+                applyHudLayout();
                 const mc = document.getElementById("minimap-container");
                 miniCanvas.width = mc ? mc.clientWidth : 180;
                 miniCanvas.height = mc ? mc.clientHeight : 160;
@@ -3655,10 +3341,25 @@
                 const myH = TILE_HEIGHT[tileType] || 1;
 
                 // Get neighbor heights for 3D edge rendering
-                const hS = TILE_HEIGHT[getNeighborType(tx, ty + 1)] || 1;
-                const hE = TILE_HEIGHT[getNeighborType(tx + 1, ty)] || 1;
-                const hN = TILE_HEIGHT[getNeighborType(tx, ty - 1)] || 1;
-                const hW = TILE_HEIGHT[getNeighborType(tx - 1, ty)] || 1;
+                const tileSouth = getNeighborType(tx, ty + 1);
+                const tileEast = getNeighborType(tx + 1, ty);
+                const tileNorth = getNeighborType(tx, ty - 1);
+                const tileWest = getNeighborType(tx - 1, ty);
+                const hS = TILE_HEIGHT[tileSouth] || 1;
+                const hE = TILE_HEIGHT[tileEast] || 1;
+                const hN = TILE_HEIGHT[tileNorth] || 1;
+                const hW = TILE_HEIGHT[tileWest] || 1;
+                const terrainDecoration =
+                    window.RSERender?.getTerrainDecoration?.(
+                        tileType,
+                        {
+                            north: tileNorth,
+                            south: tileSouth,
+                            east: tileEast,
+                            west: tileWest,
+                        },
+                        h,
+                    ) || null;
                 const edgeDepth = 5; // pixels per height unit for cliff faces
 
                 if (tileType === 0) {
@@ -3867,6 +3568,48 @@
                         ctx.lineTo(bx2 + 1, by2);
                         ctx.stroke();
                     }
+                }
+
+                if (terrainDecoration?.hasRockBands) {
+                    ctx.fillStyle = `rgba(120,105,88,${terrainDecoration.rockBandAlpha})`;
+                    ctx.fillRect(x + 2, y + 5 + h * 4, TILE - 4, 3);
+                    ctx.fillStyle = `rgba(70,60,50,${terrainDecoration.rockBandAlpha * 0.9})`;
+                    ctx.fillRect(x + 4, y + 18, TILE - 8, 2);
+                }
+                if (terrainDecoration?.hasDustOverlay) {
+                    const dust = ctx.createLinearGradient(
+                        x,
+                        y + TILE * 0.2,
+                        x,
+                        y + TILE,
+                    );
+                    dust.addColorStop(0, "rgba(215,185,120,0)");
+                    dust.addColorStop(
+                        1,
+                        `rgba(125,82,38,${terrainDecoration.dustStrength})`,
+                    );
+                    ctx.fillStyle = dust;
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.fillStyle = `rgba(88,66,40,${terrainDecoration.dustStrength * 0.85})`;
+                    ctx.fillRect(x + 4 + h * 6, y + 21, 4, 2);
+                    ctx.fillRect(x + 16, y + 24 - h * 5, 3, 2);
+                }
+                if (terrainDecoration?.hasCliffShadow) {
+                    const cliffShadow = ctx.createLinearGradient(
+                        x,
+                        y + TILE * 0.35,
+                        x + TILE,
+                        y + TILE,
+                    );
+                    cliffShadow.addColorStop(0, "rgba(0,0,0,0)");
+                    cliffShadow.addColorStop(
+                        1,
+                        `rgba(24,14,4,${terrainDecoration.shadowOpacity})`,
+                    );
+                    ctx.fillStyle = cliffShadow;
+                    ctx.fillRect(x, y, TILE, TILE);
+                    ctx.fillStyle = `rgba(230,220,180,${terrainDecoration.ridgeStrength * 0.35})`;
+                    ctx.fillRect(x + 1, y + 1, TILE - 2, 2);
                 }
 
                 // === 3D ELEVATION EDGES ===

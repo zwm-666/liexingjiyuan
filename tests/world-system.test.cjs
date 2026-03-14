@@ -34,7 +34,21 @@ const woodCount = bigGame.map.resources.filter((r) => r.type === "wood").length;
 const foodCount = bigGame.map.resources.filter((r) => r.type === "food").length;
 const goldCount = bigGame.map.resources.filter((r) => r.type === "gold").length;
 
-assert.ok(woodCount < 180, `木材点应明显减少，当前为 ${woodCount}`);
+assert.equal(bigGame.map.tiles[10][10], 0, "玩家主基地出生区应为空地");
+assert.equal(bigGame.map.tiles[117][117], 0, "敌方主基地出生区应为空地");
+assert.equal(bigGame.map.tiles[64][64], 5, "地图中心应是高地争夺区");
+assert.equal(bigGame.map.tiles[42][54], 1, "左侧坡道/主路应可通行");
+assert.equal(bigGame.map.tiles[85][74], 1, "右侧镜像坡道/主路应可通行");
+
+const mainAndNaturalGolds = bigGame.map.resources.filter(
+  (r) => r.type === "gold" && r.amount >= 4500,
+);
+assert.ok(mainAndNaturalGolds.length >= 4, "主矿/自然矿应清晰存在");
+
+assert.ok(
+  woodCount >= 80 && woodCount <= 150,
+  `木材应控制在合理范围，当前 ${woodCount}`,
+);
 assert.ok(foodCount > 0, "应保留食物资源");
 assert.ok(goldCount > 0, "应保留金矿资源");
 

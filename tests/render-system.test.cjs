@@ -1,5 +1,5 @@
 ﻿const assert = require("assert");
-const { createRenderSystem } = require("../js/render.js");
+const { createRenderSystem, getTerrainDecoration } = require("../js/render.js");
 const { FACTIONS, BUILDINGS, UNIT_VISUAL } = require("../js/game-data.js");
 
 function makeCtx() {
@@ -27,6 +27,24 @@ const G = {
   time: 0,
   players: { player: { faction: "starfire" }, enemy: { faction: "shadow" } },
 };
+
+const plateauDecoration = getTerrainDecoration(5, {
+  north: 5,
+  south: 0,
+  east: 5,
+  west: 3,
+});
+assert.equal(plateauDecoration.hasCliffShadow, true, "高地贴近低地时应生成崖壁阴影");
+assert.ok(plateauDecoration.ridgeStrength > 0.2, "高地应有明显岩脊强度");
+
+const dirtDecoration = getTerrainDecoration(1, {
+  north: 3,
+  south: 1,
+  east: 0,
+  west: 5,
+});
+assert.equal(dirtDecoration.hasDustOverlay, true, "坡道/峡谷边的土路应带有尘土覆盖");
+
 const ctx = makeCtx();
 const sprite = {
   naturalWidth: 64,

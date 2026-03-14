@@ -1,4 +1,50 @@
 ﻿(function (global) {
+  const TERRAIN_HEIGHTS = { 0: 1, 1: 1, 2: 0, 3: 3, 4: 1.5, 5: 2 };
+
+  function getTerrainDecoration(tileType, neighbors = {}, hash = 0) {
+    const tileHeight = TERRAIN_HEIGHTS[tileType] ?? 1;
+    const neighborTypes = [
+      neighbors.north ?? 0,
+      neighbors.south ?? 0,
+      neighbors.east ?? 0,
+      neighbors.west ?? 0,
+    ];
+    const neighborHeights = neighborTypes.map(
+      (neighborType) => TERRAIN_HEIGHTS[neighborType] ?? 1,
+    );
+    const dropTotal = neighborHeights.reduce(
+      (sum, neighborHeight) => sum + Math.max(0, tileHeight - neighborHeight),
+      0,
+    );
+    const adjacentCliffs = neighborTypes.filter((neighborType) => neighborType === 3).length;
+    const adjacentHighground = neighborTypes.filter((neighborType) => neighborType === 5).length;
+    const hasCliffShadow =
+      (tileType === 5 || tileType === 3) && dropTotal > 0;
+    const hasDustOverlay =
+      tileType === 1 && (adjacentCliffs > 0 || adjacentHighground > 0);
+
+    return {
+      hasCliffShadow,
+      shadowOpacity: hasCliffShadow
+        ? Math.min(0.36, 0.12 + dropTotal * 0.05 + hash * 0.06)
+        : 0,
+      ridgeStrength: Math.min(
+        0.7,
+        0.22 + dropTotal * 0.08 + hash * 0.08 + (tileType === 3 ? 0.08 : 0),
+      ),
+      hasDustOverlay,
+      dustStrength: hasDustOverlay
+        ? Math.min(
+            0.34,
+            0.12 + adjacentCliffs * 0.06 + adjacentHighground * 0.04 + hash * 0.08,
+          )
+        : 0,
+      hasRockBands: tileType === 3 || tileType === 5,
+      rockBandAlpha:
+        tileType === 3 ? 0.18 + hash * 0.08 : tileType === 5 ? 0.12 + hash * 0.06 : 0,
+    };
+  }
+
   function createRenderSystem(options) {
     let G = null;
     const getGame = options.getGame;
@@ -1377,7 +1423,7 @@
       },
     };
   }
-  const exportsObj = { createRenderSystem };
+  const exportsObj = { createRenderSystem, getTerrainDecoration };
   if (typeof module !== "undefined" && module.exports)
     module.exports = exportsObj;
   global.RSERender = exportsObj;

@@ -170,204 +170,271 @@
 
     function generateMap() {
       const G = getGame();
-      const tiles = [];
+      const W = MAP_W;
+      const H = MAP_H;
+      const tiles = Array.from({ length: H }, () => Array(W).fill(0));
       const resources = [];
-      const rng = G.rng;
-      const W = MAP_W, H = MAP_H;
 
-      // Helper: improved 2D noise (multi-octave)
-      function fbm(x, y) {
-        return noise2D(x, y) * 0.5 + noise2D(x * 2.1, y * 2.1) * 0.3 + noise2D(x * 4.3, y * 4.3) * 0.2;
+      function inBounds(x, y) {
+        return x >= 0 && x < W && y >= 0 && y < H;
       }
 
-      // Terrain: 0=grass, 1=dirt, 2=water, 3=cliff, 4=forest, 5=highground
-      for (let y = 0; y < H; y++) {
-        tiles[y] = [];
-        for (let x = 0; x < W; x++) tiles[y][x] = 0;
+      function setTile(x, y, tile) {
+        if (!inBounds(x, y)) return;
+        tiles[y][x] = tile;
       }
 
-      // Water: edges + river
-      for (let y = 0; y < H; y++)
-        for (let x = 0; x < W; x++) {
-          if (x < 2 || x >= W - 2 || y < 2 || y >= H - 2) { tiles[y][x] = 2; continue; }
-          if (x < 4 || x >= W - 4 || y < 4 || y >= H - 4) {
-            if (noise2D(x * 0.15, y * 0.15) > 0.35) tiles[y][x] = 2;
+      function paintCircle(cx, cy, radius, tile) {
+        for (let y = cy - radius; y <= cy + radius; y++) {
+          for (let x = cx - radius; x <= cx + radius; x++) {
+            const dx = x - cx;
+            const dy = y - cy;
+            if (dx * dx + dy * dy <= radius * radius) setTile(x, y, tile);
           }
         }
+      }
 
-      // Central river (diagonal divider)
-      const riverCx = W / 2, riverCy = H / 2;
-      for (let y = 4; y < H - 4; y++)
-        for (let x = 4; x < W - 4; x++) {
-          const riverLine = x - riverCx + (y - riverCy) * 0.6;
-          const riverWidth = 2.5 + noise2D(x * 0.05, y * 0.05) * 2;
-          if (Math.abs(riverLine) < riverWidth && y > 20 && y < H - 20 && x > 15 && x < W - 15) {
+      function paintEllipse(cx, cy, rx, ry, tile) {
+        for (let y = cy - ry; y <= cy + ry; y++) {
+          for (let x = cx - rx; x <= cx + rx; x++) {
+            const dx = (x - cx) / rx;
+            const dy = (y - cy) / ry;
+            if (dx * dx + dy * dy <= 1) setTile(x, y, tile);
+          }
+        }
+      }
+
+      function paintPath(points, radius, tile) {
+        for (let i = 0; i < points.length - 1; i++) {
+          const a = points[i];
+          const b = points[i + 1];
+          const steps = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) * 2;
+          for (let step = 0; step <= steps; step++) {
+            const t = steps === 0 ? 0 : step / steps;
+            const x = Math.round(a.x + (b.x - a.x) * t);
+            const y = Math.round(a.y + (b.y - a.y) * t);
+            paintCircle(x, y, radius, tile);
+          }
+        }
+      }
+
+      function mirrorPoint(point) {
+        return { x: W - 1 - point.x, y: H - 1 - point.y };
+      }
+
+      function carvePlatform(cx, cy, rx, ry) {
+        paintEllipse(cx, cy, rx, ry, 0);
+        paintEllipse(cx, cy, Math.max(2, rx - 3), Math.max(2, ry - 3), 0);
+      }
+
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          if (x < 3 || x >= W - 3 || y < 3 || y >= H - 3) {
             tiles[y][x] = 2;
           }
         }
-
-      // River crossing bridges
-      const bridgeY1 = Math.floor(H * 0.35), bridgeY2 = Math.floor(H * 0.65);
-      for (let dy = -1; dy <= 1; dy++)
-        for (let dx = -3; dx <= 3; dx++) {
-          const bx1 = Math.floor(W / 2 - bridgeY1 * 0.3) + dx;
-          if (bx1 > 3 && bx1 < W - 3) tiles[bridgeY1 + dy][bx1] = 1;
-          const bx2 = Math.floor(W / 2 - (bridgeY2 - H) * 0.3 + H * 0.3) + dx;
-          if (bx2 > 3 && bx2 < W - 3) tiles[bridgeY2 + dy][bx2] = 1;
-        }
-
-      // Small lakes
-      const numLakes = 2 + Math.floor(rng() * 3);
-      for (let i = 0; i < numLakes; i++) {
-        const lx = 15 + Math.floor(rng() * (W - 30));
-        const ly = 15 + Math.floor(rng() * (H - 30));
-        const lr = 3 + Math.floor(rng() * 4);
-        if ((lx < 25 && ly < 25) || (lx > W - 25 && ly > H - 25)) continue;
-        for (let dy = -lr; dy <= lr; dy++)
-          for (let dx = -lr; dx <= lr; dx++) {
-            if (dx * dx + dy * dy <= lr * lr + rng() * 4) {
-              const ttx = lx + dx, tty = ly + dy;
-              if (ttx > 3 && ttx < W - 3 && tty > 3 && tty < H - 3) tiles[tty][ttx] = 2;
-            }
-          }
       }
 
-      // Cliff walls
-      for (let y = 25; y < 45; y++) {
-        for (let dx = 0; dx < 3; dx++) {
-          const cx = Math.floor(W * 0.32) + dx + Math.floor(noise2D(y * 0.2, 1) * 2);
-          if (cx > 3 && cx < W - 3 && tiles[y][cx] !== 2) tiles[y][cx] = 3;
-        }
-      }
-      for (let y = H - 45; y < H - 25; y++) {
-        for (let dx = 0; dx < 3; dx++) {
-          const cx = Math.floor(W * 0.68) + dx + Math.floor(noise2D(y * 0.2, 2) * 2);
-          if (cx > 3 && cx < W - 3 && tiles[y][cx] !== 2) tiles[y][cx] = 3;
-        }
-      }
+      paintEllipse(18, 108, 10, 12, 3);
+      paintEllipse(W - 19, H - 109, 10, 12, 3);
+      paintEllipse(42, 88, 10, 7, 3);
+      paintEllipse(W - 43, H - 89, 10, 7, 3);
+      paintEllipse(46, 34, 11, 7, 3);
+      paintEllipse(W - 47, H - 35, 11, 7, 3);
 
-      // High ground plateaus
-      const hgAreas = [
-        { cx: Math.floor(W * 0.35), cy: Math.floor(H * 0.35), rx: 8, ry: 6 },
-        { cx: Math.floor(W * 0.65), cy: Math.floor(H * 0.65), rx: 8, ry: 6 },
-        { cx: Math.floor(W * 0.5), cy: Math.floor(H * 0.5), rx: 5, ry: 5 },
+      paintEllipse(64, 64, 18, 15, 3);
+      paintEllipse(64, 64, 12, 10, 5);
+      paintEllipse(50, 58, 5, 4, 5);
+      paintEllipse(78, 70, 5, 4, 5);
+      paintEllipse(24, 92, 5, 4, 5);
+      paintEllipse(W - 25, H - 93, 5, 4, 5);
+
+      const mainBase = { x: 12, y: 12 };
+      const enemyBase = mirrorPoint(mainBase);
+      const naturalA = { x: 28, y: 20 };
+      const naturalB = mirrorPoint(naturalA);
+
+      carvePlatform(mainBase.x, mainBase.y, 13, 11);
+      carvePlatform(enemyBase.x, enemyBase.y, 13, 11);
+      carvePlatform(naturalA.x, naturalA.y, 10, 8);
+      carvePlatform(naturalB.x, naturalB.y, 10, 8);
+
+      paintPath([
+        { x: 12, y: 12 },
+        { x: 20, y: 16 },
+        { x: 28, y: 20 },
+      ], 2, 1);
+      paintPath([
+        { x: 115, y: 115 },
+        { x: 107, y: 111 },
+        { x: 99, y: 107 },
+      ], 2, 1);
+
+      paintPath([
+        { x: 28, y: 20 },
+        { x: 40, y: 30 },
+        { x: 54, y: 42 },
+        { x: 60, y: 54 },
+        { x: 64, y: 58 },
+      ], 2, 1);
+      paintPath([
+        { x: 99, y: 107 },
+        { x: 88, y: 96 },
+        { x: 74, y: 85 },
+        { x: 68, y: 74 },
+        { x: 64, y: 70 },
+      ], 2, 1);
+
+      paintPath([
+        { x: 28, y: 20 },
+        { x: 34, y: 30 },
+        { x: 38, y: 42 },
+        { x: 42, y: 54 },
+        { x: 50, y: 60 },
+        { x: 58, y: 64 },
+      ], 2, 1);
+      paintPath([
+        { x: 99, y: 107 },
+        { x: 93, y: 98 },
+        { x: 89, y: 86 },
+        { x: 85, y: 74 },
+        { x: 78, y: 68 },
+        { x: 70, y: 64 },
+      ], 2, 1);
+
+      paintPath([
+        { x: 24, y: 34 },
+        { x: 30, y: 50 },
+        { x: 40, y: 70 },
+        { x: 54, y: 92 },
+        { x: 72, y: 108 },
+      ], 2, 1);
+      paintPath([
+        { x: 103, y: 93 },
+        { x: 97, y: 77 },
+        { x: 87, y: 57 },
+        { x: 73, y: 35 },
+        { x: 55, y: 19 },
+      ], 2, 1);
+
+      paintPath([
+        { x: 34, y: 24 },
+        { x: 48, y: 26 },
+        { x: 68, y: 34 },
+        { x: 92, y: 50 },
+        { x: 108, y: 72 },
+      ], 2, 1);
+      paintPath([
+        { x: 93, y: 103 },
+        { x: 79, y: 101 },
+        { x: 59, y: 93 },
+        { x: 35, y: 77 },
+        { x: 19, y: 55 },
+      ], 2, 1);
+
+      paintPath([
+        { x: 58, y: 64 },
+        { x: 64, y: 60 },
+        { x: 70, y: 64 },
+      ], 1, 5);
+      paintPath([
+        { x: 62, y: 56 },
+        { x: 64, y: 64 },
+        { x: 66, y: 72 },
+      ], 1, 5);
+
+      const goldNodes = [
+        { x: 19, y: 14, amount: 6500 },
+        { x: 30, y: 24, amount: 5000 },
+        { x: 64, y: 58, amount: 3500 },
+        { x: 20, y: 70, amount: 3000 },
       ];
-      for (const hg of hgAreas) {
-        for (let dy = -hg.ry; dy <= hg.ry; dy++)
-          for (let dx = -hg.rx; dx <= hg.rx; dx++) {
-            const dist = (dx * dx) / (hg.rx * hg.rx) + (dy * dy) / (hg.ry * hg.ry);
-            if (dist < 0.9) {
-              const ttx = hg.cx + dx, tty = hg.cy + dy;
-              if (ttx > 3 && ttx < W - 3 && tty > 3 && tty < H - 3 && tiles[tty][ttx] === 0)
-                tiles[tty][ttx] = 5;
-            }
-          }
+
+      function placeGold(x, y, amount) {
+        if (!inBounds(x, y)) return;
+        if (tiles[y][x] === 2 || tiles[y][x] === 3) return;
+        tiles[y][x] = 1;
+        resources.push({ type: 'gold', x, y, amount, max: amount, regen: 0 });
       }
 
-      // Dirt paths
-      for (let i = 0; i < 200; i++) {
-        const t = i / 200;
-        const px = Math.floor(12 + t * (W - 24) + Math.sin(t * 6) * 8);
-        const py = Math.floor(12 + t * (H - 24) + Math.cos(t * 5) * 6);
-        for (let dy = -1; dy <= 1; dy++)
-          for (let dx = -1; dx <= 1; dx++) {
-            const ttx = px + dx, tty = py + dy;
-            if (ttx > 3 && ttx < W - 3 && tty > 3 && tty < H - 3 && tiles[tty][ttx] === 0)
-              tiles[tty][ttx] = 1;
-          }
-      }
-
-      // Base areas: clear space
-      for (let dy = -10; dy <= 10; dy++)
-        for (let dx = -10; dx <= 10; dx++) {
-          const px = 10 + dx, py = 10 + dy;
-          const ex = W - 11 + dx, ey = H - 11 + dy;
-          if (px > 1 && px < W - 2 && py > 1 && py < H - 2) {
-            if (tiles[py][px] !== 2)
-              tiles[py][px] = dx * dx + dy * dy < 64 ? 0 : tiles[py][px] === 4 ? 4 : 0;
-          }
-          if (ex > 1 && ex < W - 2 && ey > 1 && ey < H - 2) {
-            if (tiles[ey][ex] !== 2)
-              tiles[ey][ex] = dx * dx + dy * dy < 64 ? 0 : tiles[ey][ex] === 4 ? 4 : 0;
-          }
+      for (const node of goldNodes) {
+        placeGold(node.x, node.y, node.amount);
+        const mirrored = mirrorPoint(node);
+        if (mirrored.x !== node.x || mirrored.y !== node.y) {
+          placeGold(mirrored.x, mirrored.y, node.amount);
         }
-
-      // Forest clusters
-      for (let y = 4; y < H - 4; y++)
-        for (let x = 4; x < W - 4; x++) {
-          if (tiles[y][x] !== 0) continue;
-          const n = fbm(x * 0.06, y * 0.06);
-          if ((x < 18 && y < 18) || (x > W - 18 && y > H - 18)) continue;
-          if (n > 0.52) tiles[y][x] = 4;
-        }
-
-      // Fog
-      G.map.fogPlayer = Array.from({ length: H }, () => new Uint8Array(W).fill(FOG_UNEXPLORED));
-      G.map.fogEnemy = Array.from({ length: H }, () => new Uint8Array(W).fill(FOG_UNEXPLORED));
-
-      // Strategic wood clusters (not every forest tile)
-      function placeWoodCluster(cx, cy, radius) {
-        for (let dy = -radius; dy <= radius; dy++)
-          for (let dx = -radius; dx <= radius; dx++) {
-            const wx = cx + dx, wy = cy + dy;
-            if (wx < 0 || wx >= W || wy < 0 || wy >= H) continue;
-            if (tiles[wy][wx] !== 4) continue;
-            resources.push({ type: 'wood', x: wx, y: wy, amount: 150, max: 150, regen: 0.1 });
-          }
       }
-      const woodClusters = [
-        // Player 1 base nearby
-        [8, 20, 2], [20, 8, 2],
-        // Player 2 base nearby
-        [W - 9, H - 21, 2], [W - 21, H - 9, 2],
-        // Expansion areas
-        [Math.floor(W * 0.3), Math.floor(H * 0.3), 2],
-        [Math.floor(W * 0.7), Math.floor(H * 0.7), 2],
-        // Center contested
-        [Math.floor(W / 2) - 8, Math.floor(H / 2), 2],
-        [Math.floor(W / 2) + 8, Math.floor(H / 2), 2],
-        // Thinner vertical side income
-        [Math.floor(W * 0.5), Math.floor(H * 0.2), 1],
-        [Math.floor(W * 0.5), Math.floor(H * 0.8), 1],
+
+      function placeFoodPatch(cx, cy) {
+        const offsets = [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+          [1, 1],
+        ];
+        for (const [dx, dy] of offsets) {
+          const x = cx + dx;
+          const y = cy + dy;
+          if (!inBounds(x, y) || tiles[y][x] === 2 || tiles[y][x] === 3) continue;
+          tiles[y][x] = 0;
+          resources.push({ type: 'food', x, y, amount: 1500, max: 1500, regen: 0 });
+        }
+      }
+
+      placeFoodPatch(14, 7);
+      placeFoodPatch(7, 14);
+      placeFoodPatch(25, 30);
+      placeFoodPatch(30, 25);
+      placeFoodPatch(62, 67);
+      placeFoodPatch(67, 62);
+      placeFoodPatch(W - 16, H - 9);
+      placeFoodPatch(W - 9, H - 16);
+      placeFoodPatch(W - 27, H - 31);
+      placeFoodPatch(W - 32, H - 26);
+
+      const woodPattern = [
+        [0, 0],
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+        [0, 1],
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+        [1, 1],
+        [-2, 0],
+        [0, 2],
       ];
-      for (const [cx, cy, radius] of woodClusters) {
-        placeWoodCluster(cx, cy, radius);
-      }
+      const woodCenters = [
+        { x: 8, y: 24 },
+        { x: 24, y: 8 },
+        { x: 36, y: 22 },
+        { x: 24, y: 38 },
+        { x: 52, y: 82 },
+      ];
 
-      // Food patches (2x2 clusters)
-      function placeFood(cx, cy) {
-        const offsets = [[0,0],[1,0],[0,1],[1,1]];
-        for (const [ddx, ddy] of offsets) {
-          const fx = cx + ddx, fy = cy + ddy;
-          if (fx > 2 && fx < W - 2 && fy > 2 && fy < H - 2 && tiles[fy][fx] !== 2 && tiles[fy][fx] !== 3) {
-            tiles[fy][fx] = 0;
-            resources.push({ type: 'food', x: fx, y: fy, amount: 1500, max: 1500, regen: 0 });
-          }
+      function placeWoodCluster(cx, cy) {
+        for (const [dx, dy] of woodPattern) {
+          const x = cx + dx;
+          const y = cy + dy;
+          if (!inBounds(x, y)) continue;
+          if (tiles[y][x] === 2 || tiles[y][x] === 3) continue;
+          if (resources.some((resource) => resource.x === x && resource.y === y)) continue;
+          tiles[y][x] = 4;
+          resources.push({ type: 'wood', x, y, amount: 150, max: 150, regen: 0.1 });
         }
       }
-      placeFood(14, 6); placeFood(6, 14);
-      placeFood(W - 16, H - 8); placeFood(W - 8, H - 16);
-      placeFood(Math.floor(W * 0.3), Math.floor(H * 0.2));
-      placeFood(Math.floor(W * 0.7), Math.floor(H * 0.8));
-      placeFood(Math.floor(W / 2) - 5, Math.floor(H / 2) - 1);
-      placeFood(Math.floor(W / 2) + 4, Math.floor(H / 2) + 1);
 
-      // Gold mines
-      function placeGold(gx, gy, amt) {
-        if (gx > 2 && gx < W - 2 && gy > 2 && gy < H - 2 && tiles[gy][gx] !== 2) {
-          tiles[gy][gx] = 1;
-          resources.push({ type: 'gold', x: gx, y: gy, amount: amt, max: amt, regen: 0 });
-        }
+      for (const center of woodCenters) {
+        placeWoodCluster(center.x, center.y);
+        const mirrored = mirrorPoint(center);
+        placeWoodCluster(mirrored.x, mirrored.y);
       }
-      placeGold(18, 12, 6000); placeGold(W - 19, H - 13, 6000);
-      placeGold(Math.floor(W * 0.3) + 1, Math.floor(H * 0.25), 5000);
-      placeGold(Math.floor(W * 0.7) - 1, Math.floor(H * 0.75), 5000);
-      placeGold(Math.floor(W / 2), Math.floor(H / 2), 10000);
-      placeGold(Math.floor(W * 0.2), Math.floor(H * 0.5), 4000);
-      placeGold(Math.floor(W * 0.8), Math.floor(H * 0.5), 4000);
 
       G.map.tiles = tiles;
       G.map.resources = resources;
+      G.map.fogPlayer = Array.from({ length: H }, () => new Uint8Array(W).fill(FOG_UNEXPLORED));
+      G.map.fogEnemy = Array.from({ length: H }, () => new Uint8Array(W).fill(FOG_UNEXPLORED));
       G.map.blocked = Array.from({ length: H }, () => new Uint8Array(W));
       G.map.resourceBlocked = Array.from({ length: H }, () => new Uint8Array(W));
       for (const resource of resources) {
