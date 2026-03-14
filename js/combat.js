@@ -89,6 +89,24 @@
     worker.prevGatherTarget = null;
   }
 
+  function cleanupDepletedResource(map, resource) {
+    if (!resource || resource.amount > 0 || resource.destroyed) return false;
+    resource.amount = 0;
+    resource.destroyed = true;
+    resource._beingGathered = false;
+    if (map?.resourceBlocked?.[resource.y]) {
+      map.resourceBlocked[resource.y][resource.x] = 0;
+    }
+    if (
+      resource.type === "wood" &&
+      map?.tiles?.[resource.y] &&
+      map.tiles[resource.y][resource.x] === 4
+    ) {
+      map.tiles[resource.y][resource.x] = 1;
+    }
+    return true;
+  }
+
   function createCombatSystem(options) {
     let G = null;
     const getGame = options.getGame;
@@ -127,7 +145,11 @@
       target.lastDamageTime = G.time; // Track for out-of-combat regen
 
       // Void Curse: shadow attacks slow the target
-      if (attacker.owner && G.players[attacker.owner]?.techs?.voidCurse && !target.isBuilding) {
+      if (
+        attacker.owner &&
+        G.players[attacker.owner]?.techs?.voidCurse &&
+        !target.isBuilding
+      ) {
         target.slowUntil = G.time + 2.5; // 2.5 second slow
         target.slowFactor = 0.5; // 50% speed reduction
       }
@@ -185,9 +207,9 @@
 
       // Stealth logic: units with canStealth cloak when idle/moving, uncloak when attacking
       if (e.canStealth) {
-        if (e.state === 'attack' || e.state === 'chase') {
+        if (e.state === "attack" || e.state === "chase") {
           e.stealthed = false;
-        } else if (!e.stealthed && (e.state === 'idle' || e.state === 'move')) {
+        } else if (!e.stealthed && (e.state === "idle" || e.state === "move")) {
           // Re-cloak after 3 seconds out of combat
           if (!e.lastDamageTime || G.time - e.lastDamageTime >= 3) {
             e.stealthed = true;
@@ -387,19 +409,7 @@
             e.carrying += gatherAmt;
             e.carryType = resType;
             e.gatherTarget.amount -= gatherAmt;
-            if (
-              e.gatherTarget.amount <= 0 &&
-              G.map.resourceBlocked?.[e.gatherTarget.y]
-            ) {
-              G.map.resourceBlocked[e.gatherTarget.y][e.gatherTarget.x] = 0;
-            }
-            // Clear depleted forest tile to grass stump
-            if (e.gatherTarget.amount <= 0 && e.gatherTarget.type === "wood") {
-              const rx = e.gatherTarget.x,
-                ry = e.gatherTarget.y;
-              if (G.map.tiles[ry] && G.map.tiles[ry][rx] === 4)
-                G.map.tiles[ry][rx] = 1;
-            }
+            cleanupDepletedResource(G.map, e.gatherTarget);
             if (e.carrying >= maxLoad || e.gatherTarget.amount <= 0) {
               if (e.gatherTarget) e.gatherTarget._beingGathered = false;
               e.state = "returning";
@@ -565,18 +575,7 @@
             e.carrying += amt;
             e.carryType = resType;
             e.gatherTarget.amount -= amt;
-            if (
-              e.gatherTarget.amount <= 0 &&
-              G.map.resourceBlocked?.[e.gatherTarget.y]
-            ) {
-              G.map.resourceBlocked[e.gatherTarget.y][e.gatherTarget.x] = 0;
-            }
-            if (e.gatherTarget.amount <= 0 && e.gatherTarget.type === "wood") {
-              const arx = e.gatherTarget.x,
-                ary = e.gatherTarget.y;
-              if (G.map.tiles[ary] && G.map.tiles[ary][arx] === 4)
-                G.map.tiles[ary][arx] = 1;
-            }
+            cleanupDepletedResource(G.map, e.gatherTarget);
             if (e.carrying >= maxLoad || e.gatherTarget.amount <= 0) {
               if (e.gatherTarget) e.gatherTarget._beingGathered = false;
               e.state = "returning";
@@ -688,7 +687,11 @@
           const enemy = findNearestEnemy(e, e.towerRange);
           if (enemy) {
             // Create a pseudo-attacker for calcDamage using tower stats
-            const towerAttacker = { atk: e.towerAtk, dmgType: e.towerDmgType || 'pierce', splash: 0 };
+            const towerAttacker = {
+              atk: e.towerAtk,
+              dmgType: e.towerDmgType || "pierce",
+              splash: 0,
+            };
             const dmg = calcDamage(towerAttacker, enemy);
             G.projectiles.push({
               x: e.x,
@@ -892,6 +895,7 @@
     pickBuilderWorker,
     findNearbyResourceForWorker,
     resumeWorkerTask,
+    cleanupDepletedResource,
   };
   if (typeof module !== "undefined" && module.exports)
     module.exports = exportsObj;

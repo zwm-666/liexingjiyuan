@@ -315,21 +315,24 @@
             resources.push({ type: 'wood', x: wx, y: wy, amount: 150, max: 150, regen: 0.1 });
           }
       }
-      // Player 1 base nearby
-      placeWoodCluster(8, 20, 3); placeWoodCluster(20, 8, 3); placeWoodCluster(22, 22, 3);
-      // Player 2 base nearby
-      placeWoodCluster(W-9, H-21, 3); placeWoodCluster(W-21, H-9, 3); placeWoodCluster(W-23, H-23, 3);
-      // Expansion areas
-      placeWoodCluster(Math.floor(W*0.3), Math.floor(H*0.3), 3);
-      placeWoodCluster(Math.floor(W*0.7), Math.floor(H*0.7), 3);
-      // Center contested
-      placeWoodCluster(Math.floor(W/2)-8, Math.floor(H/2), 3);
-      placeWoodCluster(Math.floor(W/2)+8, Math.floor(H/2), 3);
-      // Flanks
-      placeWoodCluster(Math.floor(W*0.2), Math.floor(H*0.5), 2);
-      placeWoodCluster(Math.floor(W*0.8), Math.floor(H*0.5), 2);
-      placeWoodCluster(Math.floor(W*0.5), Math.floor(H*0.2), 2);
-      placeWoodCluster(Math.floor(W*0.5), Math.floor(H*0.8), 2);
+      const woodClusters = [
+        // Player 1 base nearby
+        [8, 20, 2], [20, 8, 2],
+        // Player 2 base nearby
+        [W - 9, H - 21, 2], [W - 21, H - 9, 2],
+        // Expansion areas
+        [Math.floor(W * 0.3), Math.floor(H * 0.3), 2],
+        [Math.floor(W * 0.7), Math.floor(H * 0.7), 2],
+        // Center contested
+        [Math.floor(W / 2) - 8, Math.floor(H / 2), 2],
+        [Math.floor(W / 2) + 8, Math.floor(H / 2), 2],
+        // Thinner vertical side income
+        [Math.floor(W * 0.5), Math.floor(H * 0.2), 1],
+        [Math.floor(W * 0.5), Math.floor(H * 0.8), 1],
+      ];
+      for (const [cx, cy, radius] of woodClusters) {
+        placeWoodCluster(cx, cy, radius);
+      }
 
       // Food patches (2x2 clusters)
       function placeFood(cx, cy) {

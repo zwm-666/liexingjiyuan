@@ -21,15 +21,58 @@
     const drawTile = options.drawTile || (() => {});
     const externalDrawMinimap = options.drawMinimap || null;
     const miniCanvas = options.miniCanvas || null;
-    const mctx = miniCanvas ? miniCanvas.getContext('2d') : null;
+    const mctx = miniCanvas ? miniCanvas.getContext("2d") : null;
     const TILE_COLORS = options.TILE_COLORS || {
-      0: '#2d5a27', 1: '#7a6a4f', 2: '#1a3a5c',
-      3: '#444', 4: '#1a4a1a', 5: '#3a6a30'
+      0: "#2d5a27",
+      1: "#7a6a4f",
+      2: "#1a3a5c",
+      3: "#444",
+      4: "#1a4a1a",
+      5: "#3a6a30",
     };
     const getUnitVisualKey = options.getUnitVisualKey;
-    const getProductionTime = options.getProductionTime || ((item, owner) => 20);
-    const RESOURCE_COLORS = options.RESOURCE_COLORS || { wood: '#4a8', food: '#aa4', gold: '#da0' };
-    const SpriteLoader = (typeof window !== 'undefined' ? window.RSESpriteLoader : null);
+    const getProductionTime =
+      options.getProductionTime || ((item, owner) => 20);
+    const RESOURCE_COLORS = options.RESOURCE_COLORS || {
+      wood: "#4a8",
+      food: "#aa4",
+      gold: "#da0",
+    };
+    const SpriteLoader =
+      options.spriteLoader ||
+      (typeof window !== "undefined" ? window.RSESpriteLoader : null);
+
+    function getSpriteOpaqueBounds(sprite) {
+      const width = sprite?.naturalWidth || sprite?.width || 0;
+      const height = sprite?.naturalHeight || sprite?.height || 0;
+      const bbox = sprite?.__spriteMeta?.bbox;
+      if (!bbox || width <= 0 || height <= 0) {
+        return { left: 0, top: 0, right: width, bottom: height };
+      }
+      return {
+        left: Math.max(0, Math.min(width, bbox.left ?? 0)),
+        top: Math.max(0, Math.min(height, bbox.top ?? 0)),
+        right: Math.max(0, Math.min(width, bbox.right ?? width)),
+        bottom: Math.max(0, Math.min(height, bbox.bottom ?? height)),
+      };
+    }
+
+    function getBuildingSpriteDrawRect(sprite, bx, by, size) {
+      const width = sprite?.naturalWidth || sprite?.width || size;
+      const height = sprite?.naturalHeight || sprite?.height || size;
+      const bounds = getSpriteOpaqueBounds(sprite);
+      const drawWidth = size;
+      const drawHeight = size;
+      const scaleX = drawWidth / width;
+      const scaleY = drawHeight / height;
+      const visibleCenterX = ((bounds.left + bounds.right) / 2) * scaleX;
+      return {
+        x: bx + drawWidth / 2 - visibleCenterX,
+        y: by + drawHeight - bounds.bottom * scaleY,
+        width: drawWidth,
+        height: drawHeight,
+      };
+    }
 
     function getEntityFaction(e) {
       if (!G || !G.players) return null;
@@ -375,17 +418,33 @@
 
       // Try sprite rendering first (only after all sprites are loaded to avoid inconsistent visuals)
       const faction = getEntityFaction(e);
-      const sprite = SpriteLoader && SpriteLoader.isReady() && faction ? SpriteLoader.getBuildingSprite(faction, e.key) : null;
+      const sprite =
+        SpriteLoader && SpriteLoader.isReady() && faction
+          ? SpriteLoader.getBuildingSprite(faction, e.key)
+          : null;
       if (sprite) {
+        const drawRect = getBuildingSpriteDrawRect(sprite, bx, by, size);
         if (flash) {
           ctx.globalAlpha = alpha * 0.6;
-          ctx.drawImage(sprite, bx, by, size, size);
+          ctx.drawImage(
+            sprite,
+            drawRect.x,
+            drawRect.y,
+            drawRect.width,
+            drawRect.height,
+          );
           ctx.globalAlpha = alpha * 0.4;
           ctx.fillStyle = "#fff";
-          ctx.fillRect(bx, by, size, size);
+          ctx.fillRect(drawRect.x, drawRect.y, drawRect.width, drawRect.height);
           ctx.globalAlpha = alpha;
         } else {
-          ctx.drawImage(sprite, bx, by, size, size);
+          ctx.drawImage(
+            sprite,
+            drawRect.x,
+            drawRect.y,
+            drawRect.width,
+            drawRect.height,
+          );
         }
       } else if (e.key === "base") {
         // Castle base
@@ -769,20 +828,25 @@
         uy = drawY;
 
       // ---- Procedural animation offsets based on unit state ----
-      const isMoving = e.state === 'move' || e.state === 'chase' || e.state === 'attackMove'
-        || e.state === 'moveToResource' || e.state === 'returning';
+      const isMoving =
+        e.state === "move" ||
+        e.state === "chase" ||
+        e.state === "attackMove" ||
+        e.state === "moveToResource" ||
+        e.state === "returning";
       if (isMoving && !fly) {
         uy += -Math.abs(Math.sin(G.time * 10 + e.id * 2.3)) * 3;
-      } else if (e.state === 'attack') {
-        const atkTarget = G.entities.find(t => t.id === e.targetId);
+      } else if (e.state === "attack") {
+        const atkTarget = G.entities.find((t) => t.id === e.targetId);
         if (atkTarget) {
-          const adx = atkTarget.x - e.x, ady = atkTarget.y - e.y;
+          const adx = atkTarget.x - e.x,
+            ady = atkTarget.y - e.y;
           const adist = Math.sqrt(adx * adx + ady * ady) || 1;
           const isMelee = !e.atkRange || e.atkRange < 80;
           ux += isMelee ? (adx / adist) * 3 : -(adx / adist) * 2;
           uy += isMelee ? (ady / adist) * 3 : -(ady / adist) * 2;
         }
-      } else if (e.state === 'gathering' || e.state === 'buildAssist') {
+      } else if (e.state === "gathering" || e.state === "buildAssist") {
         ux += Math.sin(G.time * 6 + e.id) * 2;
         uy += -Math.abs(Math.sin(G.time * 6 + e.id)) * 1.5;
       } else if (!fly) {
@@ -791,15 +855,24 @@
 
       // Try sprite rendering first (only after all sprites are loaded to avoid inconsistent visuals)
       const faction = getEntityFaction(e);
-      const unitKey = e.isWorker ? 'worker' : e.key;
-      const unitSprite = SpriteLoader && SpriteLoader.isReady() && faction ? SpriteLoader.getUnitSprite(faction, unitKey) : null;
+      const unitKey = e.isWorker ? "worker" : e.key;
+      const unitSprite =
+        SpriteLoader && SpriteLoader.isReady() && faction
+          ? SpriteLoader.getUnitSprite(faction, unitKey)
+          : null;
       if (unitSprite) {
         const sw = unitSprite.naturalWidth || unitSprite.width;
         const sh = unitSprite.naturalHeight || unitSprite.height;
         const drawSize = Math.max(sw, sh, 24);
         if (flash) {
           ctx.globalAlpha = stealthAlpha * 0.6;
-          ctx.drawImage(unitSprite, ux - drawSize / 2, uy - drawSize / 2, drawSize, drawSize);
+          ctx.drawImage(
+            unitSprite,
+            ux - drawSize / 2,
+            uy - drawSize / 2,
+            drawSize,
+            drawSize,
+          );
           ctx.globalAlpha = stealthAlpha * 0.4;
           ctx.fillStyle = "#fff";
           ctx.beginPath();
@@ -807,7 +880,13 @@
           ctx.fill();
           ctx.globalAlpha = stealthAlpha;
         } else {
-          ctx.drawImage(unitSprite, ux - drawSize / 2, uy - drawSize / 2, drawSize, drawSize);
+          ctx.drawImage(
+            unitSprite,
+            ux - drawSize / 2,
+            uy - drawSize / 2,
+            drawSize,
+            drawSize,
+          );
         }
       } else if (vis === "worker") {
         // Small humanoid
@@ -1110,14 +1189,18 @@
       }
 
       // ---- Attack arc overlay (melee) ----
-      if (e.state === 'attack' && (!e.atkRange || e.atkRange < 80)) {
-        const arcTarget = G.entities.find(t => t.id === e.targetId);
+      if (e.state === "attack" && (!e.atkRange || e.atkRange < 80)) {
+        const arcTarget = G.entities.find((t) => t.id === e.targetId);
         if (arcTarget) {
           const arcAngle = Math.atan2(arcTarget.y - e.y, arcTarget.x - e.x);
           const swingPhase = (e.atkCooldown || 0) / (e.atkSpeed || 1);
-          const arcAlpha = swingPhase < 0.3 ? swingPhase / 0.3 : Math.max(0, 1 - (swingPhase - 0.3) / 0.4);
+          const arcAlpha =
+            swingPhase < 0.3
+              ? swingPhase / 0.3
+              : Math.max(0, 1 - (swingPhase - 0.3) / 0.4);
           if (arcAlpha > 0.01) {
-            ctx.strokeStyle = 'rgba(255,255,255,' + (arcAlpha * 0.6).toFixed(2) + ')';
+            ctx.strokeStyle =
+              "rgba(255,255,255," + (arcAlpha * 0.6).toFixed(2) + ")";
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(ux, uy, 16, arcAngle - 0.8, arcAngle + 0.8);
@@ -1128,22 +1211,39 @@
       }
 
       // ---- Gather particles ----
-      if (e.state === 'gathering' && e.gatherTarget && G.particles && Math.random() < 0.05) {
-        const pColor = e.carryType === 'wood' ? '#8B6914'
-          : e.carryType === 'gold' ? '#FFD700' : '#DAA520';
+      if (
+        e.state === "gathering" &&
+        e.gatherTarget &&
+        G.particles &&
+        Math.random() < 0.05
+      ) {
+        const pColor =
+          e.carryType === "wood"
+            ? "#8B6914"
+            : e.carryType === "gold"
+              ? "#FFD700"
+              : "#DAA520";
         G.particles.push({
-          x: e.x + (Math.random() - 0.5) * 8, y: e.y - 5,
-          vx: (Math.random() - 0.5) * 30, vy: -20 - Math.random() * 20,
-          life: 0.4 + Math.random() * 0.3, size: 1.5 + Math.random(), color: pColor
+          x: e.x + (Math.random() - 0.5) * 8,
+          y: e.y - 5,
+          vx: (Math.random() - 0.5) * 30,
+          vy: -20 - Math.random() * 20,
+          life: 0.4 + Math.random() * 0.3,
+          size: 1.5 + Math.random(),
+          color: pColor,
         });
       }
 
       // ---- Build assist sparks ----
-      if (e.state === 'buildAssist' && G.particles && Math.random() < 0.04) {
+      if (e.state === "buildAssist" && G.particles && Math.random() < 0.04) {
         G.particles.push({
-          x: e.x + (Math.random() - 0.5) * 10, y: e.y - 8,
-          vx: (Math.random() - 0.5) * 20, vy: -15 - Math.random() * 15,
-          life: 0.3 + Math.random() * 0.2, size: 1 + Math.random(), color: '#ccc'
+          x: e.x + (Math.random() - 0.5) * 10,
+          y: e.y - 8,
+          vx: (Math.random() - 0.5) * 20,
+          vy: -15 - Math.random() * 15,
+          life: 0.3 + Math.random() * 0.2,
+          size: 1 + Math.random(),
+          color: "#ccc",
         });
       }
 
@@ -1170,14 +1270,19 @@
 
     function drawMinimapInternal() {
       // If external callback is provided (HTML wiring), use it
-      if (externalDrawMinimap) { externalDrawMinimap(); return; }
+      if (externalDrawMinimap) {
+        externalDrawMinimap();
+        return;
+      }
       // Otherwise use built-in minimap renderer
       if (!mctx || !G) return;
-      const mw = miniCanvas.width, mh = miniCanvas.height;
+      const mw = miniCanvas.width,
+        mh = miniCanvas.height;
       if (mw === 0 || mh === 0) return;
-      mctx.fillStyle = '#141a22';
+      mctx.fillStyle = "#141a22";
       mctx.fillRect(0, 0, mw, mh);
-      const scaleX = mw / MAP_W, scaleY = mh / MAP_H;
+      const scaleX = mw / MAP_W,
+        scaleY = mh / MAP_H;
 
       // Fog source
       const mmFog = G.isMultiplayer ? myFog() : G.map.fogPlayer;
@@ -1189,10 +1294,11 @@
           const fog = mmFog[ty]?.[tx];
           if (fog === FOG_UNEXPLORED) continue;
           const tile = G.map.tiles?.[ty]?.[tx] ?? 0;
-          mctx.fillStyle = fog === FOG_VISIBLE ? (TILE_COLORS[tile] || '#2d5a27') : '#2d3440';
+          mctx.fillStyle =
+            fog === FOG_VISIBLE ? TILE_COLORS[tile] || "#2d5a27" : "#2d3440";
           mctx.fillRect(tx * scaleX, ty * scaleY, 2 * scaleX, 2 * scaleY);
           if (fog === FOG_VISIBLE) {
-            mctx.fillStyle = 'rgba(180,255,210,0.08)';
+            mctx.fillStyle = "rgba(180,255,210,0.08)";
             mctx.fillRect(tx * scaleX, ty * scaleY, 2 * scaleX, 2 * scaleY);
           }
         }
@@ -1202,10 +1308,10 @@
       if (G.map.resources) {
         for (const r of G.map.resources) {
           if (r.amount <= 0) continue;
-          if (r.type === 'wood' && G.map.tiles?.[r.y]?.[r.x] === 4) continue;
+          if (r.type === "wood" && G.map.tiles?.[r.y]?.[r.x] === 4) continue;
           const fog = mmFog[r.y]?.[r.x];
           if (!fog) continue;
-          mctx.fillStyle = RESOURCE_COLORS[r.type] || '#ff0';
+          mctx.fillStyle = RESOURCE_COLORS[r.type] || "#ff0";
           mctx.fillRect(r.x * scaleX - 1, r.y * scaleY - 1, 3, 3);
         }
       }
@@ -1213,20 +1319,32 @@
       // Entities
       for (const e of G.entities) {
         if (e.hp <= 0) continue;
-        const etx = Math.floor(e.x / TILE), ety = Math.floor(e.y / TILE);
-        if (e.owner !== myOwner() && mmFog[ety]?.[etx] !== FOG_VISIBLE) continue;
-        mctx.fillStyle = e.owner === myOwner() ? '#0f0' : '#f00';
+        const etx = Math.floor(e.x / TILE),
+          ety = Math.floor(e.y / TILE);
+        if (e.owner !== myOwner() && mmFog[ety]?.[etx] !== FOG_VISIBLE)
+          continue;
+        mctx.fillStyle = e.owner === myOwner() ? "#0f0" : "#f00";
         const sz = e.isBuilding ? 3 : 2;
-        mctx.fillRect((e.x / TILE) * scaleX - sz / 2, (e.y / TILE) * scaleY - sz / 2, sz, sz);
+        mctx.fillRect(
+          (e.x / TILE) * scaleX - sz / 2,
+          (e.y / TILE) * scaleY - sz / 2,
+          sz,
+          sz,
+        );
       }
 
       // Vision rings
-      mctx.strokeStyle = 'rgba(120,255,170,0.16)';
+      mctx.strokeStyle = "rgba(120,255,170,0.16)";
       mctx.lineWidth = 1;
       for (const e of G.entities) {
         if (e.hp <= 0 || e.owner !== myOwner()) continue;
-        const sightTiles = e.isBuilding ? (e.size || 2) * 2 + 4 : e.flying ? 10 : 7;
-        const cx = (e.x / TILE) * scaleX, cy = (e.y / TILE) * scaleY;
+        const sightTiles = e.isBuilding
+          ? (e.size || 2) * 2 + 4
+          : e.flying
+            ? 10
+            : 7;
+        const cx = (e.x / TILE) * scaleX,
+          cy = (e.y / TILE) * scaleY;
         const radius = sightTiles * ((scaleX + scaleY) / 2);
         mctx.beginPath();
         mctx.arc(cx, cy, radius, 0, Math.PI * 2);
@@ -1239,7 +1357,7 @@
       const vh = (canvas.height / cam.zoom / TILE) * scaleY;
       const vx = (cam.x / TILE) * scaleX;
       const vy = (cam.y / TILE) * scaleY;
-      mctx.strokeStyle = '#fff';
+      mctx.strokeStyle = "#fff";
       mctx.lineWidth = 1;
       mctx.strokeRect(vx, vy, vw, vh);
     }
