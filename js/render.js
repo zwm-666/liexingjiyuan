@@ -765,8 +765,29 @@
         ctx.fill();
       }
 
-      const ux = e.x,
+      let ux = e.x,
         uy = drawY;
+
+      // ---- Procedural animation offsets based on unit state ----
+      const isMoving = e.state === 'move' || e.state === 'chase' || e.state === 'attackMove'
+        || e.state === 'moveToResource' || e.state === 'returning';
+      if (isMoving && !fly) {
+        uy += -Math.abs(Math.sin(G.time * 10 + e.id * 2.3)) * 3;
+      } else if (e.state === 'attack') {
+        const atkTarget = G.entities.find(t => t.id === e.targetId);
+        if (atkTarget) {
+          const adx = atkTarget.x - e.x, ady = atkTarget.y - e.y;
+          const adist = Math.sqrt(adx * adx + ady * ady) || 1;
+          const isMelee = !e.atkRange || e.atkRange < 80;
+          ux += isMelee ? (adx / adist) * 3 : -(adx / adist) * 2;
+          uy += isMelee ? (ady / adist) * 3 : -(ady / adist) * 2;
+        }
+      } else if (e.state === 'gathering' || e.state === 'buildAssist') {
+        ux += Math.sin(G.time * 6 + e.id) * 2;
+        uy += -Math.abs(Math.sin(G.time * 6 + e.id)) * 1.5;
+      } else if (!fly) {
+        uy += Math.sin(G.time * 2 + e.id * 0.7) * 1;
+      }
 
       // Try sprite rendering first (only after all sprites are loaded to avoid inconsistent visuals)
       const faction = getEntityFaction(e);
@@ -1086,6 +1107,44 @@
         ctx.fillRect(ux - hpW / 2, uy - r - 8, hpW, 4);
         ctx.fillStyle = hpPct > 0.5 ? "#4a4" : hpPct > 0.25 ? "#aa4" : "#a44";
         ctx.fillRect(ux - hpW / 2, uy - r - 8, hpW * hpPct, 4);
+      }
+
+      // ---- Attack arc overlay (melee) ----
+      if (e.state === 'attack' && (!e.atkRange || e.atkRange < 80)) {
+        const arcTarget = G.entities.find(t => t.id === e.targetId);
+        if (arcTarget) {
+          const arcAngle = Math.atan2(arcTarget.y - e.y, arcTarget.x - e.x);
+          const swingPhase = (e.atkCooldown || 0) / (e.atkSpeed || 1);
+          const arcAlpha = swingPhase < 0.3 ? swingPhase / 0.3 : Math.max(0, 1 - (swingPhase - 0.3) / 0.4);
+          if (arcAlpha > 0.01) {
+            ctx.strokeStyle = 'rgba(255,255,255,' + (arcAlpha * 0.6).toFixed(2) + ')';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(ux, uy, 16, arcAngle - 0.8, arcAngle + 0.8);
+            ctx.stroke();
+            ctx.lineWidth = 1;
+          }
+        }
+      }
+
+      // ---- Gather particles ----
+      if (e.state === 'gathering' && e.gatherTarget && G.particles && Math.random() < 0.05) {
+        const pColor = e.carryType === 'wood' ? '#8B6914'
+          : e.carryType === 'gold' ? '#FFD700' : '#DAA520';
+        G.particles.push({
+          x: e.x + (Math.random() - 0.5) * 8, y: e.y - 5,
+          vx: (Math.random() - 0.5) * 30, vy: -20 - Math.random() * 20,
+          life: 0.4 + Math.random() * 0.3, size: 1.5 + Math.random(), color: pColor
+        });
+      }
+
+      // ---- Build assist sparks ----
+      if (e.state === 'buildAssist' && G.particles && Math.random() < 0.04) {
+        G.particles.push({
+          x: e.x + (Math.random() - 0.5) * 10, y: e.y - 8,
+          vx: (Math.random() - 0.5) * 20, vy: -15 - Math.random() * 15,
+          life: 0.3 + Math.random() * 0.2, size: 1 + Math.random(), color: '#ccc'
+        });
       }
 
       // Selection circle (at ground level)
