@@ -155,10 +155,12 @@
                 width: 100vw;
                 height: 100vh;
                 display: none;
+                flex-direction: column;
             }
             #game-canvas {
                 width: 100%;
-                height: 100%;
+                flex: 1;
+                min-height: 0;
             }
 
             /* Top bar */
@@ -210,8 +212,7 @@
 
             /* Bottom panel */
             #bottom-panel {
-                position: absolute;
-                bottom: 14px;
+                position: relative;
                 left: 0;
                 right: 0;
                 height: 160px;
@@ -220,6 +221,7 @@
                 display: flex;
                 z-index: 10;
                 backdrop-filter: blur(4px);
+                flex-shrink: 0;
             }
 
             /* Minimap */
@@ -521,6 +523,80 @@
                 color: #fff;
                 border-radius: 4px;
                 cursor: pointer;
+            }
+
+            /* Welcome popup (first-time) */
+            #welcome-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.88);
+                display: none;
+                align-items: center;
+                justify-content: center;
+                z-index: 200;
+            }
+            #welcome-box {
+                background: rgba(20, 20, 40, 0.98);
+                border: 1px solid #555;
+                border-radius: 12px;
+                padding: 28px 32px;
+                max-width: 440px;
+                text-align: center;
+            }
+            #welcome-box h2 {
+                margin-bottom: 12px;
+                color: #aaf;
+            }
+            #welcome-box table {
+                width: 100%;
+                font-size: 12px;
+                text-align: left;
+            }
+            #welcome-box td {
+                padding: 3px 8px;
+            }
+            #welcome-box .key {
+                color: #ff0;
+                font-weight: bold;
+            }
+            #welcome-box .welcome-footer {
+                margin-top: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 16px;
+            }
+            #welcome-box .welcome-footer label {
+                font-size: 12px;
+                color: #888;
+                cursor: pointer;
+                user-select: none;
+            }
+            #welcome-start {
+                padding: 10px 32px;
+                font-size: 15px;
+                border: 2px solid #7850ff;
+                border-radius: 8px;
+                background: rgba(120, 80, 255, 0.25);
+                color: #fff;
+                cursor: pointer;
+                letter-spacing: 2px;
+                transition: all 0.3s;
+            }
+            #welcome-start:hover {
+                background: rgba(120, 80, 255, 0.45);
+                box-shadow: 0 0 15px rgba(120, 80, 255, 0.4);
+            }
+
+            /* Menu help overlay (reuses help-box styles) */
+            #menu-help-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.85);
+                display: none;
+                align-items: center;
+                justify-content: center;
+                z-index: 150;
             }
 
             /* === MULTIPLAYER LOBBY === */
@@ -957,6 +1033,42 @@
             >
                 联机对战
             </button>
+            <button
+                id="menu-help-btn"
+                style="
+                    padding: 14px 40px;
+                    font-size: 18px;
+                    border: 2px solid #7850ff;
+                    border-radius: 8px;
+                    background: rgba(120, 80, 255, 0.15);
+                    color: #fff;
+                    cursor: pointer;
+                    letter-spacing: 2px;
+                    transition: all 0.3s;
+                    margin-left: 12px;
+                "
+            >
+                帮助
+            </button>
+        </div>
+
+        <!-- WELCOME POPUP (first-time) -->
+        <div id="welcome-overlay">
+            <div id="welcome-box">
+                <div id="welcome-content"></div>
+                <div class="welcome-footer">
+                    <label><input type="checkbox" id="welcome-hide-check" /> 不再显示</label>
+                    <button id="welcome-start">开始游戏</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MENU HELP OVERLAY -->
+        <div id="menu-help-overlay">
+            <div id="help-box">
+                <div id="menu-help-content"></div>
+                <button id="menu-help-close">关闭</button>
+            </div>
         </div>
 
         <!-- MULTIPLAYER LOBBY -->
@@ -1118,98 +1230,13 @@
 
             <div id="help-overlay">
                 <div id="help-box">
-                    <h2>操作指南</h2>
-                    <table>
-                        <tr>
-                            <td class="key">左键</td>
-                            <td>选择单位/建筑</td>
-                        </tr>
-                        <tr>
-                            <td class="key">左键拖拽</td>
-                            <td>框选多个单位</td>
-                        </tr>
-                        <tr>
-                            <td class="key">右键</td>
-                            <td>移动/采集/攻击</td>
-                        </tr>
-                        <tr>
-                            <td class="key">滚轮</td>
-                            <td>缩放视角</td>
-                        </tr>
-                        <tr>
-                            <td class="key">方向键</td>
-                            <td>移动摄像机</td>
-                        </tr>
-                        <tr>
-                            <td class="key">Space</td>
-                            <td>跳转到主基地</td>
-                        </tr>
-                        <tr>
-                            <td class="key">S</td>
-                            <td>停止所选单位</td>
-                        </tr>
-                        <tr>
-                            <td class="key">Esc</td>
-                            <td>取消选择/建造/暂停</td>
-                        </tr>
-                        <tr>
-                            <td class="key">F1</td>
-                            <td>显示此帮助</td>
-                        </tr>
-                        <tr id="help-mobile-section" style="display: none">
-                            <td
-                                colspan="2"
-                                style="
-                                    padding-top: 10px;
-                                    color: #6af;
-                                    font-size: 11px;
-                                    font-weight: bold;
-                                "
-                            >
-                                触屏操作:
-                            </td>
-                        </tr>
-                        <tr class="help-mobile-row" style="display: none">
-                            <td class="key">单指点击</td>
-                            <td>选择/移动/攻击</td>
-                        </tr>
-                        <tr class="help-mobile-row" style="display: none">
-                            <td class="key">长按拖拽</td>
-                            <td>框选多个单位</td>
-                        </tr>
-                        <tr class="help-mobile-row" style="display: none">
-                            <td class="key">双击单位</td>
-                            <td>选中同类单位</td>
-                        </tr>
-                        <tr class="help-mobile-row" style="display: none">
-                            <td class="key">双指拖拽</td>
-                            <td>移动摄像机</td>
-                        </tr>
-                        <tr class="help-mobile-row" style="display: none">
-                            <td class="key">双指捏合</td>
-                            <td>缩放视角</td>
-                        </tr>
-                        <tr>
-                            <td
-                                colspan="2"
-                                style="
-                                    padding-top: 10px;
-                                    color: #888;
-                                    font-size: 11px;
-                                "
-                            >
-                                选中工人后,右下方会出现可建造的建筑列表。<br />
-                                选中建筑后,可生产单位或研发科技。<br />
-                                右键点击资源点可命令工人采集。<br />
-                                升级主基地解锁更高级建筑与单位。
-                            </td>
-                        </tr>
-                    </table>
+                    <div id="ingame-help-content"></div>
                     <button id="help-close">关闭</button>
                 </div>
             </div>
         </div>
 
+        <script src="js/help-content.js"></script>
         <script src="js/game-data.js"></script>
         <script src="js/hud-layout.js"></script>
         <script src="js/sprite-loader.js"></script>
@@ -1234,12 +1261,40 @@
                 "ontouchstart" in window || navigator.maxTouchPoints > 0;
             if (isMobile) {
                 document.body.classList.add("mobile");
-                document.getElementById("help-mobile-section").style.display =
-                    "";
-                document
-                    .querySelectorAll(".help-mobile-row")
-                    .forEach((r) => (r.style.display = ""));
             }
+
+            // ---- HELP SYSTEM INIT ----
+            (function initHelp() {
+                var hc = window.RSEHelpContent;
+                // In-game F1 help (detailed)
+                document.getElementById("ingame-help-content").innerHTML =
+                    hc.getFullGuideHTML(isMobile);
+                // Main menu help overlay (detailed)
+                document.getElementById("menu-help-content").innerHTML =
+                    hc.getFullGuideHTML(isMobile);
+                // Welcome popup (brief)
+                document.getElementById("welcome-content").innerHTML =
+                    hc.getQuickGuideHTML();
+
+                // Welcome popup — show on first visit
+                if (!localStorage.getItem("rse-hide-welcome")) {
+                    document.getElementById("welcome-overlay").style.display = "flex";
+                }
+                document.getElementById("welcome-start").addEventListener("click", function () {
+                    if (document.getElementById("welcome-hide-check").checked) {
+                        localStorage.setItem("rse-hide-welcome", "1");
+                    }
+                    document.getElementById("welcome-overlay").style.display = "none";
+                });
+
+                // Main menu "帮助" button
+                document.getElementById("menu-help-btn").addEventListener("click", function () {
+                    document.getElementById("menu-help-overlay").style.display = "flex";
+                });
+                document.getElementById("menu-help-close").addEventListener("click", function () {
+                    document.getElementById("menu-help-overlay").style.display = "none";
+                });
+            })();
             const TILE = 32;
             const MAP_W = 128,
                 MAP_H = 128;
@@ -3346,7 +3401,6 @@
                     document.getElementById("minimap-container");
                 const cmdPanel = document.getElementById("cmd-panel");
                 if (bottomPanel) {
-                    bottomPanel.style.bottom = layout.bottomPanelBottom + "px";
                     bottomPanel.style.height = layout.bottomPanelHeight + "px";
                 }
                 if (minimapContainer) {
@@ -3383,8 +3437,10 @@
             }
             refreshRenderApi();
             function resizeCanvas() {
+                const bp = document.getElementById("bottom-panel");
+                const bpH = bp ? bp.offsetHeight : 0;
                 canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
+                canvas.height = window.innerHeight - bpH;
                 applyHudLayout();
                 const mc = document.getElementById("minimap-container");
                 miniCanvas.width = mc ? mc.clientWidth : 180;
@@ -4524,7 +4580,7 @@
                 mouseEnteredCanvas = true;
                 // Detect if mouse is over UI panels
                 const overTop = mouseY < 40;
-                const overBottom = mouseY > window.innerHeight - 165;
+                const overBottom = mouseY > canvas.height;
                 mouseOverUI = overTop || overBottom;
                 if (G && G.buildMode && !mouseOverUI) {
                     const wx = ev.clientX / G.camera.zoom + G.camera.x;
@@ -5339,8 +5395,8 @@
                             manualScroll = true;
                         }
                         if (
-                            mouseY > canvas.height - scrollMargin - 160 &&
-                            mouseY < canvas.height - 160
+                            mouseY > canvas.height - scrollMargin &&
+                            mouseY < canvas.height
                         ) {
                             G.camera.y += scrollSpd;
                             manualScroll = true;
@@ -5573,8 +5629,9 @@
                 document.getElementById("faction-select").style.display =
                     "none";
                 document.getElementById("game-container").style.display =
-                    "block";
+                    "flex";
                 document.getElementById("game-over").style.display = "none";
+
                 resizeCanvas();
 
                 lastTime = performance.now();
@@ -5661,7 +5718,7 @@
                 // Hide lobby, show game
                 document.getElementById("mp-lobby").style.display = "none";
                 document.getElementById("game-container").style.display =
-                    "block";
+                    "flex";
                 document.getElementById("game-over").style.display = "none";
                 resizeCanvas();
                 const ind = document.getElementById("mp-indicator");
