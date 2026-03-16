@@ -90,6 +90,10 @@
   let totalCount = 0;
   let allLoaded = false;
 
+  function shouldPreloadSprites(protocol) {
+    return protocol !== "file:";
+  }
+
   function computeSpriteMeta(img) {
     if (
       typeof document === "undefined" ||
@@ -215,6 +219,7 @@
 
   const exportsObj = {
     SPRITE_MANIFEST,
+    shouldPreloadSprites,
     loadAllSprites,
     getSprite,
     getBuildingSprite,

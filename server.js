@@ -3,6 +3,7 @@ const PORT = process.env.PORT || 3000;
 const wss = new WebSocket.Server({ port: PORT });
 
 const rooms = {};
+const matchQueue = []; // Matchmaking queue: [{ ws, faction }]
 
 function genRoomId() {
   const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -15,6 +16,50 @@ function send(ws, msg) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
+function removeFromQueue(ws) {
+  const idx = matchQueue.findIndex(e => e.ws === ws);
+  if (idx !== -1) matchQueue.splice(idx, 1);
+}
+
+function tryMatch() {
+  while (matchQueue.length >= 2) {
+    const p1 = matchQueue.shift();
+    const p2 = matchQueue.shift();
+    // Verify both still connected
+    if (p1.ws.readyState !== WebSocket.OPEN) {
+      if (p2.ws.readyState === WebSocket.OPEN) matchQueue.unshift(p2);
+      continue;
+    }
+    if (p2.ws.readyState !== WebSocket.OPEN) {
+      matchQueue.unshift(p1);
+      continue;
+    }
+    // Create room and start game
+    const roomId = genRoomId();
+    const seed = Math.floor(Math.random() * 2147483647);
+    rooms[roomId] = {
+      players: [
+        { ws: p1.ws, faction: p1.faction, slot: 'player', ready: true },
+        { ws: p2.ws, faction: p2.faction, slot: 'enemy', ready: true }
+      ],
+      state: 'playing', seed, cmdSeq: 0
+    };
+    p1.ws._roomId = roomId;
+    p1.ws._slot = 'player';
+    p2.ws._roomId = roomId;
+    p2.ws._slot = 'enemy';
+
+    const startMsg = {
+      type: 'match_found',
+      roomId,
+      seed,
+      factions: { player: p1.faction, enemy: p2.faction }
+    };
+    send(p1.ws, { ...startMsg, slot: 'player' });
+    send(p2.ws, { ...startMsg, slot: 'enemy' });
+  }
+}
+
 wss.on('connection', ws => {
   ws._roomId = null;
   ws._slot = null;
@@ -23,7 +68,21 @@ wss.on('connection', ws => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    if (msg.type === 'create') {
+    // --- Matchmaking ---
+    if (msg.type === 'match') {
+      removeFromQueue(ws);
+      matchQueue.push({ ws, faction: msg.faction });
+      send(ws, { type: 'queued', position: matchQueue.length });
+      tryMatch();
+    }
+
+    else if (msg.type === 'cancel_match') {
+      removeFromQueue(ws);
+      send(ws, { type: 'match_cancelled' });
+    }
+
+    // --- Legacy room system (keep for private matches) ---
+    else if (msg.type === 'create') {
       const roomId = genRoomId();
       const seed = Math.floor(Math.random() * 2147483647);
       rooms[roomId] = {
@@ -54,10 +113,8 @@ wss.on('connection', ws => {
       if (!room) return;
       const p = room.players.find(p => p.ws === ws);
       if (p) p.ready = true;
-      // Notify the other player
       const other = room.players.find(p => p.ws !== ws);
       if (other) send(other.ws, { type: 'opponent_ready' });
-      // Start if both ready
       if (room.players.length === 2 && room.players.every(p => p.ready)) {
         room.state = 'playing';
         const startMsg = {
@@ -82,6 +139,9 @@ wss.on('connection', ws => {
   });
 
   ws.on('close', () => {
+    // Remove from matchmaking queue
+    removeFromQueue(ws);
+    // Handle room disconnect
     const rid = ws._roomId;
     if (!rid || !rooms[rid]) return;
     const room = rooms[rid];
@@ -94,3 +154,4 @@ wss.on('connection', ws => {
 });
 
 console.log('Rift Star Era - WebSocket server running on port ' + PORT);
+console.log('Matchmaking enabled');

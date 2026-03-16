@@ -620,6 +620,40 @@
                 margin: 12px 0;
                 font-size: 13px;
             }
+            .lobby-btn.match-btn {
+                border-color: #ff8c00;
+                background: rgba(255, 140, 0, 0.2);
+                font-size: 17px;
+                padding: 12px 36px;
+            }
+            .lobby-btn.match-btn:hover {
+                background: rgba(255, 140, 0, 0.4);
+                box-shadow: 0 0 20px rgba(255, 140, 0, 0.3);
+            }
+            .lobby-btn.match-btn:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+            }
+            #match-waiting-section {
+                text-align: center;
+            }
+            .match-spinner {
+                display: inline-block;
+                font-size: 18px;
+                color: #ff8c00;
+                margin: 16px 0;
+                animation: matchPulse 1.5s ease-in-out infinite;
+            }
+            @keyframes matchPulse {
+                0%, 100% { opacity: 0.6; }
+                50% { opacity: 1; text-shadow: 0 0 12px rgba(255, 140, 0, 0.6); }
+            }
+            .lobby-section-label {
+                color: #666;
+                font-size: 12px;
+                margin: 16px 0 8px 0;
+                letter-spacing: 1px;
+            }
             .lobby-opponent {
                 color: #4f4;
                 font-size: 16px;
@@ -935,11 +969,16 @@
             ></div>
             <div id="lobby-menu-section">
                 <div style="margin-bottom: 8px">
+                    <button class="lobby-btn match-btn" id="match-btn">
+                        快速匹配
+                    </button>
+                </div>
+                <div class="lobby-divider">--- 好友房间 ---</div>
+                <div style="margin-bottom: 8px">
                     <button class="lobby-btn" id="create-room-btn">
                         创建房间
                     </button>
                 </div>
-                <div class="lobby-divider">--- 或 ---</div>
                 <div style="margin-bottom: 8px">
                     <input
                         id="room-code-input"
@@ -965,6 +1004,20 @@
                         type="text"
                         value="ws://localhost:3000"
                     />
+                </div>
+            </div>
+            <div
+                id="match-waiting-section"
+                style="display: none; text-align: center"
+            >
+                <div class="match-spinner">正在匹配中</div>
+                <div class="lobby-status" id="match-queue-text">
+                    正在搜索对手...
+                </div>
+                <div style="margin-top: 16px">
+                    <button class="lobby-btn secondary" id="match-cancel-btn">
+                        取消匹配
+                    </button>
                 </div>
             </div>
             <div
@@ -1203,24 +1256,37 @@
             if (window.RSESpriteLoader) {
                 var startBtn = document.getElementById("start-btn");
                 var originalText = startBtn.textContent;
-                startBtn.textContent = "加载素材中...";
-                startBtn.disabled = true;
-                startBtn.style.opacity = "0.6";
-                window.RSESpriteLoader.loadAllSprites(
-                    function (loaded, total) {
-                        var pct = Math.round((loaded / total) * 100);
-                        startBtn.textContent = "加载素材 " + pct + "%";
-                        console.log(
-                            "[Sprites] Loading: " + loaded + "/" + total,
-                        );
-                    },
-                    function () {
-                        startBtn.textContent = originalText;
-                        startBtn.disabled = false;
-                        startBtn.style.opacity = "1";
-                        console.log("[Sprites] All sprites loaded!");
-                    },
-                );
+                if (
+                    window.RSESpriteLoader.shouldPreloadSprites(
+                        window.location.protocol,
+                    )
+                ) {
+                    startBtn.textContent = "加载素材中...";
+                    startBtn.disabled = true;
+                    startBtn.style.opacity = "0.6";
+                    window.RSESpriteLoader.loadAllSprites(
+                        function (loaded, total) {
+                            var pct = Math.round((loaded / total) * 100);
+                            startBtn.textContent = "加载素材 " + pct + "%";
+                            console.log(
+                                "[Sprites] Loading: " + loaded + "/" + total,
+                            );
+                        },
+                        function () {
+                            startBtn.textContent = originalText;
+                            startBtn.disabled = false;
+                            startBtn.style.opacity = "1";
+                            console.log("[Sprites] All sprites loaded!");
+                        },
+                    );
+                } else {
+                    startBtn.textContent = originalText;
+                    startBtn.disabled = false;
+                    startBtn.style.opacity = "1";
+                    console.log(
+                        "[Sprites] file:// 模式下跳过预加载，使用程序化渲染",
+                    );
+                }
             }
             const { chooseResearchTech, getTrainableUnitKeys } =
                 window.RSEAiLogic;
@@ -1588,6 +1654,24 @@
                         break;
                     case "start":
                         startMultiplayerGame(msg.seed, msg.factions);
+                        break;
+                    case "match_found":
+                        NET.roomId = msg.roomId;
+                        NET.mySlot = msg.slot;
+                        NET.opponentSlot =
+                            msg.slot === "player" ? "enemy" : "player";
+                        startMultiplayerGame(msg.seed, msg.factions);
+                        break;
+                    case "queued":
+                        document.getElementById(
+                            "match-queue-text",
+                        ).textContent =
+                            "正在搜索对手... (队列中第" +
+                            msg.position +
+                            "位)";
+                        break;
+                    case "match_cancelled":
+                        resetMatchUI();
                         break;
                     case "cmd":
                         if (msg.from !== NET.mySlot)
@@ -5671,7 +5755,19 @@
                     "block";
                 document.getElementById("lobby-waiting-section").style.display =
                     "none";
+                document.getElementById(
+                    "match-waiting-section",
+                ).style.display = "none";
                 document.getElementById("room-code-input").value = "";
+            }
+
+            function resetMatchUI() {
+                document.getElementById(
+                    "match-waiting-section",
+                ).style.display = "none";
+                document.getElementById("lobby-menu-section").style.display =
+                    "block";
+                document.getElementById("match-btn").disabled = false;
             }
 
             // ---- MENU LOGIC ----
@@ -5751,6 +5847,42 @@
                     "你的阵营: " + factionName;
                 resetLobbyUI();
             });
+
+            // ---- MATCHMAKING HANDLERS ----
+            document
+                .getElementById("match-btn")
+                .addEventListener("click", async () => {
+                    const url = document
+                        .getElementById("server-url-input")
+                        .value.trim();
+                    if (!url) {
+                        alert("请输入服务器地址");
+                        return;
+                    }
+                    try {
+                        if (!NET.connected) await netConnect(url);
+                        netSend({ type: "match", faction: selectedFaction });
+                        document.getElementById(
+                            "lobby-menu-section",
+                        ).style.display = "none";
+                        document.getElementById(
+                            "match-waiting-section",
+                        ).style.display = "block";
+                        document.getElementById(
+                            "match-queue-text",
+                        ).textContent = "正在搜索对手...";
+                    } catch (e) {
+                        alert("连接服务器失败: " + e.message);
+                    }
+                });
+
+            document
+                .getElementById("match-cancel-btn")
+                .addEventListener("click", () => {
+                    netSend({ type: "cancel_match" });
+                    netDisconnect();
+                    resetMatchUI();
+                });
 
             document
                 .getElementById("create-room-btn")
