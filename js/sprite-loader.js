@@ -91,7 +91,7 @@
   let allLoaded = false;
 
   function shouldPreloadSprites(protocol) {
-    return protocol !== "file:";
+    return true;
   }
 
   function computeSpriteMeta(img) {
@@ -112,7 +112,13 @@
     if (!ctx) return null;
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(img, 0, 0, width, height);
-    const pixels = ctx.getImageData(0, 0, width, height).data;
+    var pixels;
+    try {
+      pixels = ctx.getImageData(0, 0, width, height).data;
+    } catch (e) {
+      // file:// 协议下 getImageData 可能因 CORS 限制失败，返回整图边界
+      return { bbox: { left: 0, top: 0, right: width, bottom: height } };
+    }
     let left = width;
     let right = -1;
     let top = height;
