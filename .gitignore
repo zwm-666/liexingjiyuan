@@ -2,3 +2,8 @@ node_modules/
 .env
 .DS_Store
 Thumbs.db
+服务器更新与重启说明.txt
+AGENTS.md
+.claude/
+tests/
+docs/plans/
