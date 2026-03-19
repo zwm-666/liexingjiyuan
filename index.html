@@ -31,122 +31,368 @@
             #faction-select {
                 position: absolute;
                 inset: 0;
-                background: linear-gradient(
-                    135deg,
-                    #0a0a12 0%,
-                    #1a1025 50%,
-                    #0a0a12 100%
-                );
+                background:
+                    radial-gradient(circle at 18% 18%, rgba(255, 124, 42, 0.2), transparent 26%),
+                    radial-gradient(circle at 82% 22%, rgba(109, 176, 255, 0.16), transparent 28%),
+                    radial-gradient(circle at 50% 100%, rgba(120, 80, 255, 0.18), transparent 42%),
+                    linear-gradient(135deg, #06070d 0%, #111625 42%, #090b13 100%);
                 display: flex;
-                flex-direction: column;
                 align-items: center;
                 justify-content: center;
                 z-index: 100;
+                overflow: hidden;
+                padding: 32px;
             }
-            #faction-select h1 {
-                font-size: 48px;
-                color: #fff;
-                text-shadow: 0 0 30px rgba(120, 80, 255, 0.5);
-                margin-bottom: 8px;
-                letter-spacing: 6px;
+            #faction-select::before,
+            #faction-select::after,
+            #mp-lobby::before,
+            #mp-lobby::after {
+                content: "";
+                position: absolute;
+                pointer-events: none;
             }
-            #faction-select .subtitle {
-                color: #888;
-                font-size: 16px;
-                margin-bottom: 40px;
+            #faction-select::before,
+            #mp-lobby::before {
+                inset: 28px;
+                border: 1px solid rgba(150, 170, 255, 0.12);
+                border-radius: 26px;
+                box-shadow: inset 0 0 60px rgba(255, 255, 255, 0.03);
+            }
+            #faction-select::after,
+            #mp-lobby::after {
+                width: 520px;
+                height: 520px;
+                right: -180px;
+                bottom: -220px;
+                background: radial-gradient(circle, rgba(255, 140, 0, 0.1), transparent 68%);
+                filter: blur(10px);
+            }
+            .menu-shell,
+            .lobby-shell {
+                position: relative;
+                z-index: 1;
+                width: min(1220px, 100%);
+                display: grid;
+                grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
+                gap: 28px;
+                align-items: stretch;
+            }
+            .menu-hero,
+            .menu-side-panel,
+            .lobby-hero,
+            .lobby-side-panel {
+                border: 1px solid rgba(120, 146, 200, 0.18);
+                background: linear-gradient(180deg, rgba(15, 19, 31, 0.9), rgba(8, 10, 18, 0.94));
+                box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+                backdrop-filter: blur(12px);
+            }
+            .menu-hero,
+            .lobby-hero {
+                border-radius: 28px;
+                padding: 42px 40px 34px;
+                overflow: hidden;
+            }
+            .menu-side-panel,
+            .lobby-side-panel {
+                border-radius: 24px;
+                padding: 30px 28px;
+            }
+            .menu-kicker,
+            .lobby-kicker {
+                display: inline-flex;
+                align-items: center;
+                gap: 10px;
+                padding: 6px 14px;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.04);
+                color: #8aa0c7;
+                font-size: 12px;
                 letter-spacing: 2px;
+                text-transform: uppercase;
+                margin-bottom: 18px;
+            }
+            .menu-kicker::before,
+            .lobby-kicker::before {
+                content: "";
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #ff9a3c;
+                box-shadow: 0 0 14px rgba(255, 154, 60, 0.6);
+            }
+            #faction-select h1,
+            #mp-lobby h1 {
+                font-size: clamp(40px, 5vw, 64px);
+                color: #fff;
+                text-shadow: 0 0 30px rgba(120, 80, 255, 0.35);
+                margin-bottom: 10px;
+                letter-spacing: 8px;
+                line-height: 1;
+            }
+            #faction-select .subtitle,
+            #mp-lobby .subtitle {
+                color: #7a87a8;
+                font-size: 15px;
+                margin-bottom: 18px;
+                letter-spacing: 3px;
+            }
+            .menu-copy,
+            .lobby-copy {
+                max-width: 640px;
+                color: #afbbd2;
+                font-size: 15px;
+                line-height: 1.8;
+                margin-bottom: 26px;
+            }
+            .menu-stats,
+            .lobby-stats {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 14px;
+                margin-bottom: 26px;
+            }
+            .menu-stat,
+            .lobby-stat {
+                padding: 16px 18px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 18px;
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+            }
+            .menu-stat .value,
+            .lobby-stat .value {
+                display: block;
+                font-size: 24px;
+                font-weight: bold;
+                color: #fff;
+                margin-bottom: 4px;
+            }
+            .menu-stat .label,
+            .lobby-stat .label {
+                font-size: 12px;
+                color: #7c8aad;
+                letter-spacing: 1px;
+            }
+            .section-heading {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 14px;
+            }
+            .section-heading h2 {
+                font-size: 22px;
+                color: #f4f7ff;
+                letter-spacing: 2px;
+            }
+            .section-heading span {
+                color: #6e7895;
+                font-size: 12px;
+                letter-spacing: 1px;
             }
             .faction-cards {
                 display: flex;
-                gap: 24px;
-                margin-bottom: 30px;
+                gap: 18px;
+                margin-bottom: 26px;
             }
             .faction-card {
-                width: 220px;
-                padding: 24px 18px;
-                border: 2px solid #333;
-                border-radius: 12px;
-                background: rgba(20, 20, 35, 0.9);
+                flex: 1;
+                min-width: 0;
+                padding: 24px 20px;
+                border: 1px solid rgba(110, 124, 164, 0.35);
+                border-radius: 22px;
+                background: linear-gradient(180deg, rgba(25, 29, 45, 0.92), rgba(13, 15, 27, 0.94));
                 cursor: pointer;
                 transition: all 0.3s;
                 text-align: center;
+                position: relative;
+                overflow: hidden;
+            }
+            .faction-card::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 45%);
+                opacity: 0;
+                transition: opacity 0.3s;
             }
             .faction-card:hover {
-                transform: translateY(-4px);
+                transform: translateY(-6px);
+                border-color: rgba(255, 255, 255, 0.2);
+            }
+            .faction-card:hover::before,
+            .faction-card.selected::before {
+                opacity: 1;
             }
             .faction-card.starfire {
-                border-color: #ff4400;
+                border-color: rgba(255, 98, 41, 0.55);
             }
             .faction-card.starfire:hover,
             .faction-card.starfire.selected {
-                background: rgba(255, 68, 0, 0.15);
-                box-shadow: 0 0 25px rgba(255, 68, 0, 0.3);
+                background: linear-gradient(180deg, rgba(67, 24, 12, 0.96), rgba(18, 12, 14, 0.96));
+                box-shadow: 0 18px 36px rgba(255, 68, 0, 0.18);
             }
             .faction-card.shadow {
-                border-color: #8844cc;
+                border-color: rgba(153, 109, 255, 0.5);
             }
             .faction-card.shadow:hover,
             .faction-card.shadow.selected {
-                background: rgba(136, 68, 204, 0.15);
-                box-shadow: 0 0 25px rgba(136, 68, 204, 0.3);
+                background: linear-gradient(180deg, rgba(36, 23, 68, 0.96), rgba(15, 13, 28, 0.96));
+                box-shadow: 0 18px 36px rgba(136, 68, 204, 0.18);
             }
             .faction-card.steel {
-                border-color: #6699cc;
+                border-color: rgba(102, 153, 204, 0.5);
             }
             .faction-card.steel:hover,
             .faction-card.steel.selected {
-                background: rgba(102, 153, 204, 0.15);
-                box-shadow: 0 0 25px rgba(102, 153, 204, 0.3);
+                background: linear-gradient(180deg, rgba(16, 41, 62, 0.96), rgba(11, 18, 29, 0.96));
+                box-shadow: 0 18px 36px rgba(102, 153, 204, 0.18);
             }
             .faction-card .icon {
-                font-size: 48px;
-                margin-bottom: 10px;
+                font-size: 50px;
+                margin-bottom: 14px;
             }
             .faction-card .name {
                 font-size: 20px;
                 font-weight: bold;
-                margin-bottom: 8px;
+                margin-bottom: 10px;
+                color: #f7f9ff;
             }
             .faction-card .desc {
                 font-size: 12px;
-                color: #999;
-                line-height: 1.5;
+                color: #9ba8c2;
+                line-height: 1.7;
             }
             .difficulty-row {
                 display: flex;
                 gap: 12px;
-                margin-bottom: 30px;
+                margin-bottom: 24px;
+                flex-wrap: wrap;
             }
             .diff-btn {
-                padding: 8px 20px;
-                border: 1px solid #444;
-                border-radius: 6px;
-                background: rgba(30, 30, 50, 0.8);
-                color: #ccc;
+                padding: 10px 18px;
+                border: 1px solid rgba(112, 124, 159, 0.35);
+                border-radius: 999px;
+                background: rgba(17, 21, 35, 0.86);
+                color: #b9c5da;
                 cursor: pointer;
                 font-size: 14px;
                 transition: all 0.2s;
+                min-width: 88px;
+                text-align: center;
             }
             .diff-btn:hover,
             .diff-btn.selected {
-                background: rgba(120, 80, 255, 0.3);
-                border-color: #7850ff;
+                background: rgba(86, 113, 179, 0.26);
+                border-color: #8fb4ff;
                 color: #fff;
+                box-shadow: 0 0 20px rgba(91, 133, 255, 0.16);
             }
-            #start-btn {
-                padding: 14px 60px;
-                font-size: 18px;
-                border: 2px solid #7850ff;
-                border-radius: 8px;
-                background: rgba(120, 80, 255, 0.2);
+            .menu-action-grid {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 12px;
+            }
+            .menu-action-btn,
+            .lobby-btn {
+                padding: 14px 18px;
+                font-size: 15px;
+                border: 1px solid rgba(109, 136, 196, 0.45);
+                border-radius: 16px;
+                background: linear-gradient(180deg, rgba(70, 102, 180, 0.24), rgba(28, 35, 58, 0.58));
                 color: #fff;
                 cursor: pointer;
-                letter-spacing: 2px;
+                letter-spacing: 1px;
                 transition: all 0.3s;
+                min-height: 68px;
+                text-align: left;
+                position: relative;
+                overflow: hidden;
             }
-            #start-btn:hover {
-                background: rgba(120, 80, 255, 0.4);
-                box-shadow: 0 0 20px rgba(120, 80, 255, 0.4);
+            .menu-action-btn::before,
+            .lobby-btn::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), transparent 40%);
+                opacity: 0;
+                transition: opacity 0.3s;
+            }
+            .menu-action-btn:hover,
+            .lobby-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 18px 28px rgba(0, 0, 0, 0.22);
+                border-color: rgba(150, 190, 255, 0.55);
+            }
+            .menu-action-btn:hover::before,
+            .lobby-btn:hover::before {
+                opacity: 1;
+            }
+            .menu-action-btn strong,
+            .lobby-btn strong {
+                display: block;
+                font-size: 16px;
+                margin-bottom: 5px;
+            }
+            .menu-action-btn span,
+            .lobby-btn span {
+                display: block;
+                color: #9ba8c2;
+                font-size: 12px;
+                line-height: 1.5;
+            }
+            #start-btn {
+                border-color: rgba(120, 170, 255, 0.7);
+                background: linear-gradient(180deg, rgba(71, 121, 255, 0.34), rgba(21, 31, 53, 0.72));
+            }
+            #pvp-btn,
+            .lobby-btn.match-btn {
+                border-color: rgba(255, 145, 72, 0.65);
+                background: linear-gradient(180deg, rgba(255, 130, 56, 0.34), rgba(52, 25, 13, 0.72));
+            }
+            #menu-help-btn,
+            .lobby-btn.secondary {
+                border-color: rgba(132, 148, 187, 0.35);
+                background: linear-gradient(180deg, rgba(74, 82, 111, 0.22), rgba(24, 29, 46, 0.72));
+            }
+            .menu-side-panel h3,
+            .lobby-side-panel h3 {
+                font-size: 20px;
+                letter-spacing: 2px;
+                margin-bottom: 10px;
+                color: #fff;
+            }
+            .menu-side-panel .panel-copy,
+            .lobby-side-panel .panel-copy {
+                color: #92a0ba;
+                font-size: 13px;
+                line-height: 1.7;
+                margin-bottom: 18px;
+            }
+            .menu-feature-list,
+            .lobby-feature-list {
+                display: grid;
+                gap: 12px;
+            }
+            .menu-feature,
+            .lobby-feature {
+                padding: 14px 16px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 16px;
+                background: rgba(255, 255, 255, 0.03);
+            }
+            .menu-feature strong,
+            .lobby-feature strong {
+                display: block;
+                color: #fff;
+                margin-bottom: 6px;
+                font-size: 14px;
+            }
+            .menu-feature span,
+            .lobby-feature span {
+                color: #8e9bb6;
+                font-size: 12px;
+                line-height: 1.6;
             }
 
             /* === GAME HUD === */
@@ -603,121 +849,86 @@
             #mp-lobby {
                 position: absolute;
                 inset: 0;
-                background: linear-gradient(
-                    135deg,
-                    #0a0a12 0%,
-                    #1a1025 50%,
-                    #0a0a12 100%
-                );
+                background:
+                    radial-gradient(circle at 20% 20%, rgba(255, 129, 80, 0.16), transparent 25%),
+                    radial-gradient(circle at 80% 10%, rgba(105, 168, 255, 0.12), transparent 25%),
+                    linear-gradient(140deg, #070910 0%, #101528 52%, #090c15 100%);
                 display: none;
-                flex-direction: column;
                 align-items: center;
                 justify-content: center;
                 z-index: 100;
-            }
-            #mp-lobby h1 {
-                font-size: 42px;
-                color: #fff;
-                text-shadow: 0 0 25px rgba(120, 80, 255, 0.5);
-                margin-bottom: 6px;
-                letter-spacing: 5px;
-            }
-            #mp-lobby .subtitle {
-                color: #888;
-                font-size: 15px;
-                margin-bottom: 24px;
-                letter-spacing: 2px;
+                overflow: hidden;
+                padding: 32px;
             }
             .lobby-btn {
-                padding: 10px 30px;
-                font-size: 15px;
-                margin: 6px;
-                border: 2px solid #7850ff;
-                border-radius: 8px;
-                background: rgba(120, 80, 255, 0.2);
-                color: #fff;
-                cursor: pointer;
-                letter-spacing: 1px;
-                transition: all 0.3s;
-                display: inline-block;
-            }
-            .lobby-btn:hover {
-                background: rgba(120, 80, 255, 0.4);
-                box-shadow: 0 0 15px rgba(120, 80, 255, 0.3);
+                width: 100%;
+                margin: 0;
             }
             .lobby-btn:disabled {
                 opacity: 0.4;
                 cursor: not-allowed;
             }
-            .lobby-btn.secondary {
-                border-color: #555;
-                background: rgba(40, 40, 60, 0.5);
-            }
-            .lobby-btn.secondary:hover {
-                background: rgba(60, 60, 100, 0.5);
-            }
             .lobby-btn.ready-btn {
-                border-color: #4a4;
-                background: rgba(40, 160, 40, 0.2);
-            }
-            .lobby-btn.ready-btn:hover {
-                background: rgba(40, 160, 40, 0.4);
-                box-shadow: 0 0 15px rgba(40, 160, 40, 0.3);
+                border-color: rgba(96, 204, 132, 0.55);
+                background: linear-gradient(180deg, rgba(46, 156, 80, 0.3), rgba(18, 48, 24, 0.76));
             }
             #room-code-input {
                 font-size: 24px;
                 text-align: center;
-                width: 140px;
-                padding: 8px;
-                background: rgba(20, 20, 40, 0.9);
+                width: 100%;
+                padding: 12px 14px;
+                background: rgba(14, 18, 31, 0.95);
                 color: #fff;
-                border: 2px solid #555;
-                border-radius: 8px;
+                border: 1px solid rgba(109, 120, 152, 0.35);
+                border-radius: 16px;
                 text-transform: uppercase;
                 letter-spacing: 6px;
                 outline: none;
             }
             #room-code-input:focus {
-                border-color: #7850ff;
+                border-color: #7aa5ff;
+                box-shadow: 0 0 0 3px rgba(122, 165, 255, 0.12);
             }
             #room-code-display {
                 font-size: 42px;
                 letter-spacing: 8px;
-                color: #ff0;
+                color: #ffd76f;
                 font-weight: bold;
             }
             .lobby-status {
-                color: #aaa;
+                color: #a7b1c9;
                 font-size: 14px;
                 margin: 8px 0;
             }
             .lobby-divider {
-                color: #444;
-                margin: 12px 0;
-                font-size: 13px;
+                color: #576177;
+                margin: 14px 0;
+                font-size: 12px;
+                letter-spacing: 2px;
+                text-transform: uppercase;
             }
             .lobby-btn.match-btn {
-                border-color: #ff8c00;
-                background: rgba(255, 140, 0, 0.2);
                 font-size: 17px;
-                padding: 12px 36px;
-            }
-            .lobby-btn.match-btn:hover {
-                background: rgba(255, 140, 0, 0.4);
-                box-shadow: 0 0 20px rgba(255, 140, 0, 0.3);
             }
             .lobby-btn.match-btn:disabled {
                 opacity: 0.4;
                 cursor: not-allowed;
             }
             #match-waiting-section {
-                text-align: center;
+                display: none;
             }
             .match-spinner {
-                display: inline-block;
-                font-size: 18px;
-                color: #ff8c00;
-                margin: 16px 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 92px;
+                height: 92px;
+                font-size: 14px;
+                color: #ffb468;
+                margin: 10px auto 18px;
+                border-radius: 50%;
+                border: 1px solid rgba(255, 160, 82, 0.3);
+                background: radial-gradient(circle, rgba(255, 155, 82, 0.18), rgba(31, 18, 8, 0.86));
                 animation: matchPulse 1.5s ease-in-out infinite;
             }
             @keyframes matchPulse {
@@ -731,25 +942,103 @@
                 letter-spacing: 1px;
             }
             .lobby-opponent {
-                color: #4f4;
+                color: #7dff9a;
                 font-size: 16px;
                 margin: 8px 0;
             }
             .server-url-row {
-                margin-top: 20px;
+                margin-top: 18px;
                 font-size: 12px;
-                color: #666;
+                color: #6f7a94;
             }
             .server-url-row input {
-                background: rgba(20, 20, 40, 0.9);
-                color: #aaa;
-                border: 1px solid #444;
-                border-radius: 4px;
-                padding: 3px 8px;
+                background: rgba(14, 18, 31, 0.92);
+                color: #c0cadf;
+                border: 1px solid rgba(109, 120, 152, 0.35);
+                border-radius: 10px;
+                padding: 8px 10px;
                 font-size: 12px;
-                width: 220px;
+                width: 100%;
                 text-align: center;
                 outline: none;
+            }
+            .server-url-row input:focus {
+                border-color: #7aa5ff;
+                box-shadow: 0 0 0 3px rgba(122, 165, 255, 0.12);
+            }
+            .menu-note,
+            .lobby-note {
+                margin-top: 18px;
+                padding-top: 16px;
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                color: #73809f;
+                font-size: 12px;
+                line-height: 1.7;
+            }
+            .lobby-panel-grid {
+                display: grid;
+                grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+                gap: 18px;
+            }
+            .lobby-card {
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 22px;
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+                padding: 20px;
+            }
+            .lobby-card.quick-match-card {
+                background: linear-gradient(180deg, rgba(255, 140, 64, 0.14), rgba(30, 20, 14, 0.7));
+                border-color: rgba(255, 145, 72, 0.22);
+            }
+            .lobby-card h3 {
+                font-size: 18px;
+                margin-bottom: 10px;
+                color: #fff;
+                letter-spacing: 1px;
+            }
+            .lobby-card p {
+                color: #99a5c0;
+                font-size: 13px;
+                line-height: 1.7;
+                margin-bottom: 16px;
+            }
+            .lobby-card-actions {
+                display: grid;
+                gap: 10px;
+            }
+            .lobby-flow {
+                display: grid;
+                gap: 10px;
+            }
+            .lobby-flow-step {
+                padding: 12px 14px;
+                border-radius: 14px;
+                background: rgba(255, 255, 255, 0.035);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+            }
+            .lobby-flow-step strong {
+                display: block;
+                color: #fff;
+                margin-bottom: 4px;
+                font-size: 13px;
+            }
+            .lobby-flow-step span {
+                color: #90a0bd;
+                font-size: 12px;
+                line-height: 1.6;
+            }
+            .lobby-room-stack {
+                display: grid;
+                gap: 10px;
+            }
+            .waiting-card {
+                max-width: 420px;
+                margin: 0 auto;
+                padding: 24px;
+                border-radius: 22px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(12, 16, 27, 0.92));
+                text-align: center;
             }
             #mp-indicator {
                 position: absolute;
@@ -832,14 +1121,23 @@
                     padding: 16px;
                     overflow-y: auto;
                 }
-                #faction-select h1 {
-                    font-size: 28px;
-                    letter-spacing: 3px;
-                    margin-bottom: 4px;
+                .menu-shell,
+                .lobby-shell,
+                .lobby-panel-grid {
+                    grid-template-columns: 1fr;
                 }
-                #faction-select .subtitle {
-                    font-size: 12px;
-                    margin-bottom: 20px;
+                .menu-hero,
+                .menu-side-panel,
+                .lobby-hero,
+                .lobby-side-panel {
+                    padding: 22px 18px;
+                    border-radius: 20px;
+                }
+                .menu-kicker,
+                .lobby-kicker {
+                    font-size: 11px;
+                    letter-spacing: 1px;
+                    margin-bottom: 14px;
                 }
                 .faction-cards {
                     flex-direction: column;
@@ -847,8 +1145,8 @@
                     align-items: center;
                 }
                 .faction-card {
-                    width: 80vw;
-                    max-width: 300px;
+                    width: 100%;
+                    max-width: none;
                     padding: 14px 12px;
                 }
                 .faction-card .icon {
@@ -863,21 +1161,21 @@
                 }
                 .difficulty-row {
                     gap: 8px;
-                    flex-wrap: wrap;
-                    justify-content: center;
+                    justify-content: flex-start;
                 }
                 .diff-btn {
                     padding: 6px 14px;
                     font-size: 12px;
                 }
-                #start-btn {
-                    padding: 10px 28px;
-                    font-size: 15px;
+                .menu-stats,
+                .lobby-stats,
+                .menu-action-grid {
+                    grid-template-columns: 1fr;
                 }
-                #pvp-btn {
-                    padding: 10px 20px !important;
-                    font-size: 15px !important;
-                    margin-left: 6px !important;
+                .menu-action-btn,
+                .lobby-btn {
+                    min-height: 60px;
+                    padding: 12px 14px;
                 }
                 #top-bar {
                     height: 30px;
@@ -960,9 +1258,6 @@
                     padding: 16px;
                     overflow-y: auto;
                 }
-                #mp-lobby h1 {
-                    font-size: 28px;
-                }
                 #help-box {
                     max-width: 90vw;
                     padding: 16px;
@@ -980,76 +1275,109 @@
     <body>
         <!-- FACTION SELECT -->
         <div id="faction-select">
-            <h1>裂星纪元</h1>
-            <div class="subtitle">RIFT STAR ERA</div>
-            <div class="faction-cards">
-                <div
-                    class="faction-card starfire selected"
-                    data-faction="starfire"
-                >
-                    <div class="icon">🔥</div>
-                    <div class="name">星火族</div>
-                    <div class="desc">
-                        高爆发 · 范围伤害<br />木材采集快<br />毁灭之炎 /
-                        浴火重生
+            <div class="menu-shell">
+                <div class="menu-hero">
+                    <div class="menu-kicker">边境战区启动中</div>
+                    <h1>裂星纪元</h1>
+                    <div class="subtitle">RIFT STAR ERA</div>
+                    <div class="menu-copy">
+                        指挥舰队降落、扩张资源线、推进科技树，并在星际断层之间建立你的前线。
+                        首页延续当前深空科幻风格，强化了开局仪式感与模式入口层次。
+                    </div>
+                    <div class="menu-stats">
+                        <div class="menu-stat">
+                            <span class="value">3</span>
+                            <span class="label">可选阵营</span>
+                        </div>
+                        <div class="menu-stat">
+                            <span class="value">4</span>
+                            <span class="label">战局难度</span>
+                        </div>
+                        <div class="menu-stat">
+                            <span class="value">RTS</span>
+                            <span class="label">即时策略核心</span>
+                        </div>
+                    </div>
+                    <div class="section-heading">
+                        <h2>选择你的阵营</h2>
+                        <span>保留原有阵营卡交互</span>
+                    </div>
+                    <div class="faction-cards">
+                        <div
+                            class="faction-card starfire selected"
+                            data-faction="starfire"
+                        >
+                            <div class="icon">🔥</div>
+                            <div class="name">星火族</div>
+                            <div class="desc">
+                                高爆发 · 范围伤害<br />木材采集快<br />毁灭之炎 /
+                                浴火重生
+                            </div>
+                        </div>
+                        <div class="faction-card shadow" data-faction="shadow">
+                            <div class="icon">🌑</div>
+                            <div class="name">幽影族</div>
+                            <div class="desc">
+                                隐形 · 高机动<br />粮食采集快<br />暗杀艺术 / 虚空腐蚀
+                            </div>
+                        </div>
+                        <div class="faction-card steel" data-faction="steel">
+                            <div class="icon">⚙️</div>
+                            <div class="name">钢铁联军</div>
+                            <div class="desc">
+                                重甲 · 阵地战<br />负载最大<br />重装甲壳 / 火力覆盖
+                            </div>
+                        </div>
+                    </div>
+                    <div class="section-heading">
+                        <h2>战役预案</h2>
+                        <span>难度会影响 AI 压力</span>
+                    </div>
+                    <div class="difficulty-row">
+                        <div class="diff-btn" data-diff="easy">简单</div>
+                        <div class="diff-btn selected" data-diff="normal">普通</div>
+                        <div class="diff-btn" data-diff="hard">困难</div>
+                        <div class="diff-btn" data-diff="insane">疯狂</div>
+                    </div>
+                    <div class="menu-action-grid">
+                        <button type="button" class="menu-action-btn" id="start-btn">
+                            <strong>单人游戏</strong>
+                            <span>立即进入战场，对抗 AI 并熟悉经济与兵种节奏。</span>
+                        </button>
+                        <button type="button" class="menu-action-btn" id="pvp-btn">
+                            <strong>联机对战</strong>
+                            <span>进入匹配中枢，快速匹配或用房间号与好友开战。</span>
+                        </button>
+                        <button type="button" class="menu-action-btn" id="menu-help-btn">
+                            <strong>帮助</strong>
+                            <span>查看键位、经济循环、科技路线与联机流程。</span>
+                        </button>
                     </div>
                 </div>
-                <div class="faction-card shadow" data-faction="shadow">
-                    <div class="icon">🌑</div>
-                    <div class="name">幽影族</div>
-                    <div class="desc">
-                        隐形 · 高机动<br />粮食采集快<br />暗杀艺术 / 虚空腐蚀
+                <div class="menu-side-panel">
+                    <h3>指挥官简报</h3>
+                    <div class="panel-copy">
+                        新首页将信息分成“选择阵营 / 选择难度 / 开始行动”三层，减少初次进入时的信息拥挤感。
                     </div>
-                </div>
-                <div class="faction-card steel" data-faction="steel">
-                    <div class="icon">⚙️</div>
-                    <div class="name">钢铁联军</div>
-                    <div class="desc">
-                        重甲 · 阵地战<br />负载最大<br />重装甲壳 / 火力覆盖
+                    <div class="menu-feature-list">
+                        <div class="menu-feature">
+                            <strong>火线风格</strong>
+                            <span>使用橙蓝点光与深色玻璃面板，延续现有战场 HUD 的科幻质感。</span>
+                        </div>
+                        <div class="menu-feature">
+                            <strong>入口更清晰</strong>
+                            <span>单人、联机、帮助三个入口并列呈现，首次进入就能看到完整路径。</span>
+                        </div>
+                        <div class="menu-feature">
+                            <strong>移动端兼容</strong>
+                            <span>桌面双栏、移动单栏，保留当前原生 HTML 与按钮事件绑定方式。</span>
+                        </div>
+                    </div>
+                    <div class="menu-note">
+                        小提示：先用单人熟悉资源节奏，再进入联机大厅能更快适应对战开局。
                     </div>
                 </div>
             </div>
-            <div class="difficulty-row">
-                <div class="diff-btn" data-diff="easy">简单</div>
-                <div class="diff-btn selected" data-diff="normal">普通</div>
-                <div class="diff-btn" data-diff="hard">困难</div>
-                <div class="diff-btn" data-diff="insane">疯狂</div>
-            </div>
-            <button id="start-btn">单人游戏</button>
-            <button
-                id="pvp-btn"
-                style="
-                    padding: 14px 40px;
-                    font-size: 18px;
-                    border: 2px solid #f44;
-                    border-radius: 8px;
-                    background: rgba(255, 60, 60, 0.15);
-                    color: #fff;
-                    cursor: pointer;
-                    letter-spacing: 2px;
-                    transition: all 0.3s;
-                    margin-left: 12px;
-                "
-            >
-                联机对战
-            </button>
-            <button
-                id="menu-help-btn"
-                style="
-                    padding: 14px 40px;
-                    font-size: 18px;
-                    border: 2px solid #7850ff;
-                    border-radius: 8px;
-                    background: rgba(120, 80, 255, 0.15);
-                    color: #fff;
-                    cursor: pointer;
-                    letter-spacing: 2px;
-                    transition: all 0.3s;
-                    margin-left: 12px;
-                "
-            >
-                帮助
-            </button>
         </div>
 
         <!-- WELCOME POPUP (first-time) -->
@@ -1058,7 +1386,7 @@
                 <div id="welcome-content"></div>
                 <div class="welcome-footer">
                     <label><input type="checkbox" id="welcome-hide-check" /> 不再显示</label>
-                    <button id="welcome-start">开始游戏</button>
+                    <button type="button" id="welcome-start">开始游戏</button>
                 </div>
             </div>
         </div>
@@ -1067,91 +1395,149 @@
         <div id="menu-help-overlay">
             <div id="help-box">
                 <div id="menu-help-content"></div>
-                <button id="menu-help-close">关闭</button>
+                <button type="button" id="menu-help-close">关闭</button>
             </div>
         </div>
 
         <!-- MULTIPLAYER LOBBY -->
         <div id="mp-lobby">
-            <h1>裂星纪元</h1>
-            <div class="subtitle">联机对战</div>
-            <div
-                id="lobby-faction-info"
-                style="color: #aaa; font-size: 14px; margin-bottom: 16px"
-            ></div>
-            <div id="lobby-menu-section">
-                <div style="margin-bottom: 8px">
-                    <button class="lobby-btn match-btn" id="match-btn">
-                        快速匹配
-                    </button>
+            <div class="lobby-shell">
+                <div class="lobby-hero">
+                    <div class="lobby-kicker">对战中枢已连接</div>
+                    <h1>裂星纪元</h1>
+                    <div class="subtitle">联机对战</div>
+                    <div class="lobby-copy">
+                        这里保留现有匹配、建房、入房与准备逻辑，但用更像“指挥中枢”的版式重新组织入口和等待状态。
+                    </div>
+                    <div class="lobby-stats">
+                        <div class="lobby-stat">
+                            <span class="value">PVP</span>
+                            <span class="label">快速匹配 / 好友房</span>
+                        </div>
+                        <div class="lobby-stat">
+                            <span class="value">4位</span>
+                            <span class="label">房间码连接</span>
+                        </div>
+                        <div class="lobby-stat">
+                            <span class="value">实时</span>
+                            <span class="label">WebSocket 对战</span>
+                        </div>
+                    </div>
+                    <div id="lobby-faction-info" class="lobby-status"></div>
+                    <div id="lobby-menu-section">
+                        <div class="lobby-panel-grid">
+                            <div class="lobby-card quick-match-card">
+                                <h3>快速匹配</h3>
+                                <p>系统会根据当前服务器中的等待玩家为你寻找对手，适合直接开战。</p>
+                                <div class="lobby-card-actions">
+                                    <button type="button" class="lobby-btn match-btn" id="match-btn">
+                                        <strong>开始匹配</strong>
+                                        <span>进入自动队列，搜索在线指挥官。</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="lobby-card">
+                                <h3>联机流程</h3>
+                                <div class="lobby-flow">
+                                    <div class="lobby-flow-step">
+                                        <strong>1. 选择阵营</strong>
+                                        <span>大厅会继承你在首页选中的阵营。</span>
+                                    </div>
+                                    <div class="lobby-flow-step">
+                                        <strong>2. 快速匹配或建房</strong>
+                                        <span>可以立即排队，也可以通过房间码邀请好友。</span>
+                                    </div>
+                                    <div class="lobby-flow-step">
+                                        <strong>3. 双方准备</strong>
+                                        <span>房间模式下双方准备完成后自动开局。</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="lobby-divider">好友房间</div>
+                        <div class="lobby-room-stack">
+                            <button type="button" class="lobby-btn" id="create-room-btn">
+                                <strong>创建房间</strong>
+                                <span>生成 4 位房间号，等待好友加入。</span>
+                            </button>
+                            <input
+                                id="room-code-input"
+                                type="text"
+                                placeholder="输入4位房间号"
+                                maxlength="4"
+                            />
+                            <button type="button" class="lobby-btn" id="join-room-btn">
+                                <strong>加入房间</strong>
+                                <span>输入房间号后直接进入等待区。</span>
+                            </button>
+                            <button type="button" class="lobby-btn secondary" id="lobby-back-btn">
+                                <strong>返回首页</strong>
+                                <span>断开联机连接，回到主页重新选择模式。</span>
+                            </button>
+                        </div>
+                        <div class="server-url-row">
+                            服务器:
+                            <input id="server-url-input" type="text" value="" />
+                        </div>
+                    </div>
+                    <div id="match-waiting-section">
+                        <div class="waiting-card">
+                            <div class="match-spinner">匹配中</div>
+                            <div class="lobby-status" id="match-queue-text">
+                                正在搜索对手...
+                            </div>
+                            <button type="button" class="lobby-btn secondary" id="match-cancel-btn">
+                                <strong>取消匹配</strong>
+                                <span>离开自动匹配队列，返回大厅主面板。</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="lobby-waiting-section" class="waiting-card" style="display: none">
+                        <div class="lobby-status">房间号:</div>
+                        <div id="room-code-display"></div>
+                        <div class="lobby-status" id="lobby-wait-text">
+                            等待对手加入...
+                        </div>
+                        <div class="lobby-opponent" id="lobby-opponent-info"></div>
+                        <div id="lobby-ready-area" style="display: none">
+                            <button type="button" class="lobby-btn ready-btn" id="ready-btn">
+                                <strong>准备就绪</strong>
+                                <span>确认阵营与连接状态后通知对手。</span>
+                            </button>
+                        </div>
+                        <div
+                            class="lobby-status"
+                            id="lobby-ready-status"
+                            style="display: none"
+                        ></div>
+                        <button type="button" class="lobby-btn secondary" id="lobby-cancel-btn">
+                            <strong>取消等待</strong>
+                            <span>退出当前房间并返回联机大厅。</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="lobby-divider">--- 好友房间 ---</div>
-                <div style="margin-bottom: 8px">
-                    <button class="lobby-btn" id="create-room-btn">
-                        创建房间
-                    </button>
-                </div>
-                <div style="margin-bottom: 8px">
-                    <input
-                        id="room-code-input"
-                        type="text"
-                        placeholder="房间号"
-                        maxlength="4"
-                    />
-                </div>
-                <div>
-                    <button class="lobby-btn" id="join-room-btn">
-                        加入房间
-                    </button>
-                </div>
-                <div style="margin-top: 16px">
-                    <button class="lobby-btn secondary" id="lobby-back-btn">
-                        返回
-                    </button>
-                </div>
-                <div class="server-url-row">
-                    服务器:
-                    <input id="server-url-input" type="text" value="" />
-                </div>
-            </div>
-            <div
-                id="match-waiting-section"
-                style="display: none; text-align: center"
-            >
-                <div class="match-spinner">正在匹配中</div>
-                <div class="lobby-status" id="match-queue-text">
-                    正在搜索对手...
-                </div>
-                <div style="margin-top: 16px">
-                    <button class="lobby-btn secondary" id="match-cancel-btn">
-                        取消匹配
-                    </button>
-                </div>
-            </div>
-            <div
-                id="lobby-waiting-section"
-                style="display: none; text-align: center"
-            >
-                <div class="lobby-status">房间号:</div>
-                <div id="room-code-display"></div>
-                <div class="lobby-status" id="lobby-wait-text">
-                    等待对手加入...
-                </div>
-                <div class="lobby-opponent" id="lobby-opponent-info"></div>
-                <div id="lobby-ready-area" style="display: none">
-                    <button class="lobby-btn ready-btn" id="ready-btn">
-                        准备就绪
-                    </button>
-                </div>
-                <div
-                    class="lobby-status"
-                    id="lobby-ready-status"
-                    style="display: none"
-                ></div>
-                <div style="margin-top: 16px">
-                    <button class="lobby-btn secondary" id="lobby-cancel-btn">
-                        取消
-                    </button>
+                <div class="lobby-side-panel">
+                    <h3>联机战报</h3>
+                    <div class="panel-copy">
+                        新大厅把“快速匹配”和“好友房”拆成两个明确区块，等待状态也独立成卡片，不会和入口操作混在一起。
+                    </div>
+                    <div class="lobby-feature-list">
+                        <div class="lobby-feature">
+                            <strong>快速匹配优先展示</strong>
+                            <span>橙色高亮主入口，突出“直接开战”的联机体验。</span>
+                        </div>
+                        <div class="lobby-feature">
+                            <strong>房间操作更集中</strong>
+                            <span>创建、输入房间号、加入、返回全部收拢为一列，桌面和移动端都更清晰。</span>
+                        </div>
+                        <div class="lobby-feature">
+                            <strong>等待状态更有氛围</strong>
+                            <span>用独立等待卡片承载匹配中、房间号、准备状态与对手信息。</span>
+                        </div>
+                    </div>
+                    <div class="lobby-note">
+                        如果需要本地联机，先运行 `node server.js`，然后确认这里的服务器地址可访问。
+                    </div>
                 </div>
             </div>
         </div>
@@ -1178,7 +1564,7 @@
                     👤 <span id="pop-cur">5</span>/<span id="pop-max">10</span>
                 </div>
                 <div id="game-timer">00:00</div>
-                <button id="menu-btn">菜单</button>
+                <button type="button" id="menu-btn">菜单</button>
             </div>
             <div id="mp-indicator">
                 <span class="mp-tag" id="mp-tag"></span
@@ -1206,28 +1592,28 @@
             <div id="tooltip"></div>
 
             <div id="mobile-toolbar">
-                <button id="mob-deselect" title="取消选择">✕</button>
-                <button id="mob-stop" title="停止">⏹</button>
-                <button id="mob-home" title="回到基地">🏠</button>
+                <button type="button" id="mob-deselect" title="取消选择">✕</button>
+                <button type="button" id="mob-stop" title="停止">⏹</button>
+                <button type="button" id="mob-home" title="回到基地">🏠</button>
             </div>
 
             <div id="game-over">
                 <h1 id="game-over-title"></h1>
                 <div class="stats" id="game-over-stats"></div>
-                <button id="restart-btn">返回主菜单</button>
+                <button type="button" id="restart-btn">返回主菜单</button>
             </div>
 
             <div id="pause-overlay">
                 <h1>已暂停</h1>
                 <div class="pause-hint">按 Esc 或 P 继续游戏</div>
-                <button id="pause-resume">继续游戏</button>
-                <button id="pause-menu">返回主菜单</button>
+                <button type="button" id="pause-resume">继续游戏</button>
+                <button type="button" id="pause-menu">返回主菜单</button>
             </div>
 
             <div id="help-overlay">
                 <div id="help-box">
                     <div id="ingame-help-content"></div>
-                    <button id="help-close">关闭</button>
+                    <button type="button" id="help-close">关闭</button>
                 </div>
             </div>
         </div>
