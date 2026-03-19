@@ -442,10 +442,10 @@
       const topSpawn = { x: center.x, y: 16 };
       const topMainMine = { x: center.x, y: 25 };
       const topExpansion = { x: center.x - 18, y: 12 };
-      const topNearWoodLeft = { x: center.x - 14, y: 20 };
-      const topNearWoodRight = { x: center.x + 14, y: 20 };
-      const topFoodLeft = { x: center.x - 10, y: 21 };
-      const topFoodRight = { x: center.x + 6, y: 21 };
+      const topNearWoodLeft = { x: center.x - 5, y: 19 };
+      const topNearWoodRight = { x: center.x + 5, y: 19 };
+      const topFoodLeft = { x: center.x - 8, y: 22 };
+      const topFoodRight = { x: center.x + 6, y: 22 };
       const topBuildPocket = { x: center.x, y: 20 };
 
       const mainRoad = [

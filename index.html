@@ -5669,6 +5669,25 @@
             }
 
             // ---- GAME INITIALIZATION ----
+            function spawnStartingWorkers(owner, base, verticalDirection) {
+                const formation = [
+                    { x: -48, y: 72 },
+                    { x: -16, y: 72 },
+                    { x: 16, y: 72 },
+                    { x: -32, y: 104 },
+                    { x: 0, y: 104 },
+                ];
+                for (const point of formation) {
+                    spawnUnit(
+                        owner,
+                        "worker",
+                        base.x + point.x,
+                        base.y + verticalDirection * point.y,
+                        true,
+                    );
+                }
+            }
+
             function startGame(playerFaction, difficulty) {
                 // Pick random enemy faction
                 const factions = ["starfire", "shadow", "steel"];
@@ -5688,51 +5707,31 @@
                 refreshCombatApi();
                 generateMap();
 
-                // Spawn player base + workers (top-left)
-                const pb = spawnBuilding("player", "base", 6, 6);
+                const playerBaseTx = 63;
+                const playerBaseTy = 14;
+                const playerSupplyTx = 67;
+                const playerSupplyTy = 14;
+                const enemyBaseTx = 62;
+                const enemyBaseTy = 110;
+                const enemySupplyTx = 58;
+                const enemySupplyTy = 110;
+
+                const pb = spawnBuilding("player", "base", playerBaseTx, playerBaseTy);
                 pb.isConstructing = false;
                 pb.hp = pb.maxHp;
                 pb.buildProgress = pb.buildTime;
-                for (let i = 0; i < 5; i++) {
-                    spawnUnit(
-                        "player",
-                        "worker",
-                        7 * TILE + i * 20,
-                        10 * TILE,
-                        true,
-                    );
-                }
-                // Spawn initial supply
-                const ps = spawnBuilding("player", "supply", 10, 6);
+                spawnStartingWorkers("player", pb, 1);
+                const ps = spawnBuilding("player", "supply", playerSupplyTx, playerSupplyTy);
                 ps.isConstructing = false;
                 ps.hp = ps.maxHp;
                 ps.buildProgress = ps.buildTime;
 
-                // Spawn enemy base + workers (bottom-right)
-                const eb = spawnBuilding(
-                    "enemy",
-                    "base",
-                    MAP_W - 10,
-                    MAP_H - 10,
-                );
+                const eb = spawnBuilding("enemy", "base", enemyBaseTx, enemyBaseTy);
                 eb.isConstructing = false;
                 eb.hp = eb.maxHp;
                 eb.buildProgress = eb.buildTime;
-                for (let i = 0; i < 5; i++) {
-                    spawnUnit(
-                        "enemy",
-                        "worker",
-                        (MAP_W - 9) * TILE + i * 20,
-                        (MAP_H - 6) * TILE,
-                        true,
-                    );
-                }
-                const es = spawnBuilding(
-                    "enemy",
-                    "supply",
-                    MAP_W - 14,
-                    MAP_H - 10,
-                );
+                spawnStartingWorkers("enemy", eb, -1);
+                const es = spawnBuilding("enemy", "supply", enemySupplyTx, enemySupplyTy);
                 es.isConstructing = false;
                 es.hp = es.maxHp;
                 es.buildProgress = es.buildTime;
@@ -5779,50 +5778,31 @@
                 G.mySlot = NET.mySlot;
                 generateMap();
 
-                // Spawn player base + workers (top-left) - 'player' owner always top-left
-                const pb = spawnBuilding("player", "base", 6, 6);
+                const playerBaseTx = 63;
+                const playerBaseTy = 14;
+                const playerSupplyTx = 67;
+                const playerSupplyTy = 14;
+                const enemyBaseTx = 62;
+                const enemyBaseTy = 110;
+                const enemySupplyTx = 58;
+                const enemySupplyTy = 110;
+
+                const pb = spawnBuilding("player", "base", playerBaseTx, playerBaseTy);
                 pb.isConstructing = false;
                 pb.hp = pb.maxHp;
                 pb.buildProgress = pb.buildTime;
-                for (let i = 0; i < 5; i++) {
-                    spawnUnit(
-                        "player",
-                        "worker",
-                        7 * TILE + i * 20,
-                        10 * TILE,
-                        true,
-                    );
-                }
-                const ps = spawnBuilding("player", "supply", 10, 6);
+                spawnStartingWorkers("player", pb, 1);
+                const ps = spawnBuilding("player", "supply", playerSupplyTx, playerSupplyTy);
                 ps.isConstructing = false;
                 ps.hp = ps.maxHp;
                 ps.buildProgress = ps.buildTime;
 
-                // Spawn enemy base + workers (bottom-right) - 'enemy' owner always bottom-right
-                const eb = spawnBuilding(
-                    "enemy",
-                    "base",
-                    MAP_W - 10,
-                    MAP_H - 10,
-                );
+                const eb = spawnBuilding("enemy", "base", enemyBaseTx, enemyBaseTy);
                 eb.isConstructing = false;
                 eb.hp = eb.maxHp;
                 eb.buildProgress = eb.buildTime;
-                for (let i = 0; i < 5; i++) {
-                    spawnUnit(
-                        "enemy",
-                        "worker",
-                        (MAP_W - 9) * TILE + i * 20,
-                        (MAP_H - 6) * TILE,
-                        true,
-                    );
-                }
-                const es = spawnBuilding(
-                    "enemy",
-                    "supply",
-                    MAP_W - 14,
-                    MAP_H - 10,
-                );
+                spawnStartingWorkers("enemy", eb, -1);
+                const es = spawnBuilding("enemy", "supply", enemySupplyTx, enemySupplyTy);
                 es.isConstructing = false;
                 es.hp = es.maxHp;
                 es.buildProgress = es.buildTime;
