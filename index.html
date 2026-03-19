@@ -1111,11 +1111,7 @@
                 </div>
                 <div class="server-url-row">
                     服务器:
-                    <input
-                        id="server-url-input"
-                        type="text"
-                        value="ws://localhost:3000"
-                    />
+                    <input id="server-url-input" type="text" value="" />
                 </div>
             </div>
             <div
@@ -5990,6 +5986,16 @@
                         }
                     }
                 });
+
+            function getDefaultServerUrl() {
+                const hostname = window.location.hostname || "localhost";
+                return "ws://" + hostname + ":3000";
+            }
+
+            const serverUrlInput = document.getElementById("server-url-input");
+            if (serverUrlInput && !serverUrlInput.value.trim()) {
+                serverUrlInput.value = getDefaultServerUrl();
+            }
 
             // ---- PVP / LOBBY HANDLERS ----
             document.getElementById("pvp-btn").addEventListener("click", () => {
