@@ -37,11 +37,12 @@
                     radial-gradient(circle at 50% 100%, rgba(120, 80, 255, 0.18), transparent 42%),
                     linear-gradient(135deg, #06070d 0%, #111625 42%, #090b13 100%);
                 display: flex;
-                align-items: center;
                 justify-content: center;
                 z-index: 100;
-                overflow: hidden;
+                overflow-x: hidden;
                 padding: 32px;
+                overflow-y: auto;
+                align-items: flex-start;
             }
             #faction-select::before,
             #faction-select::after,
@@ -71,11 +72,9 @@
             .lobby-shell {
                 position: relative;
                 z-index: 1;
-                width: min(1220px, 100%);
-                display: grid;
-                grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.95fr);
-                gap: 28px;
-                align-items: stretch;
+                width: min(980px, 100%);
+                margin: auto;
+                display: block;
             }
             .menu-hero,
             .menu-side-panel,
@@ -96,6 +95,7 @@
             .lobby-side-panel {
                 border-radius: 24px;
                 padding: 30px 28px;
+                display: none;
             }
             .menu-kicker,
             .lobby-kicker {
@@ -632,7 +632,6 @@
                 inset: 0;
                 background: rgba(0, 0, 0, 0.8);
                 display: none;
-                align-items: center;
                 justify-content: center;
                 flex-direction: column;
                 z-index: 50;
@@ -854,11 +853,12 @@
                     radial-gradient(circle at 80% 10%, rgba(105, 168, 255, 0.12), transparent 25%),
                     linear-gradient(140deg, #070910 0%, #101528 52%, #090c15 100%);
                 display: none;
-                align-items: center;
                 justify-content: center;
                 z-index: 100;
-                overflow: hidden;
+                overflow-x: hidden;
                 padding: 32px;
+                overflow-y: auto;
+                align-items: flex-start;
             }
             .lobby-btn {
                 width: 100%;
@@ -1125,6 +1125,10 @@
                 .lobby-shell,
                 .lobby-panel-grid {
                     grid-template-columns: 1fr;
+                }
+                .menu-shell,
+                .lobby-shell {
+                    width: 100%;
                 }
                 .menu-hero,
                 .menu-side-panel,
