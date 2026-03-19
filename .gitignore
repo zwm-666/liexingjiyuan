@@ -7,3 +7,5 @@ AGENTS.md
 .claude/
 tests/
 docs/plans/
+.sisyphus/
+_original_index.html
