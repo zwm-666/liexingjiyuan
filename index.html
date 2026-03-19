@@ -2098,7 +2098,7 @@
                 if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H)
                     return false;
                 const t = G.map.tiles[ty][tx];
-                if (t === 2 || t === 3) return false;
+                if (t === 2 || t === 3 || t === 4) return false;
                 return !G.map.blocked[ty][tx];
             }
 
@@ -3450,12 +3450,12 @@
             resizeCanvas();
 
             const TILE_COLORS = {
-                0: "#2d5a27", // grass
-                1: "#7a6a4f", // dirt
-                2: "#1a3a5c", // water
-                3: "#444", // cliff
-                4: "#1a4a1a", // forest
-                5: "#3a6a30", // high ground
+                0: "#4f9c45", // grass (bright lush green)
+                1: "#9a7653", // dirt (warm brown)
+                2: "#1f4f8a", // water (deep blue)
+                3: "#3e3d3a", // cliff (dark gray-brown)
+                4: "#1e4a1f", // forest (dark green)
+                5: "#7faa43", // high ground (golden green)
             };
 
             function tileHash(tx, ty) {
@@ -3473,354 +3473,457 @@
                 return G.map.tiles[ty][tx];
             }
 
-            function drawTile(tx, ty, tileType, fog) {
-                const x = tx * TILE,
-                    y = ty * TILE;
-                const h = tileHash(tx, ty);
-                const t = G ? G.time : 0;
-                const myH = TILE_HEIGHT[tileType] || 1;
+            function drawTile(ctx, tileType, pixelX, pixelY, tileSizeArg, opts) {
+                // Supports both signatures:
+                // 1) drawTile(ctx, tileType, pixelX, pixelY, TILE, opts)
+                // 2) legacy drawTile(tx, ty, tileType, fog)
+                let tileCtx = ctx;
+                let resolvedTileType = tileType;
+                let x = pixelX;
+                let y = pixelY;
+                const fallbackTileSize =
+                    typeof tileSizeArg === "number" && Number.isFinite(tileSizeArg)
+                        ? tileSizeArg
+                        : typeof TILE === "number" && Number.isFinite(TILE)
+                          ? TILE
+                          : 32;
+                let tileSize = fallbackTileSize;
+                let tx = opts?.tx;
+                let ty = opts?.ty;
+                let t = opts?.time || 0;
+                let getN = opts?.getNeighborType;
+                let getDecoration = opts?.getTerrainDecoration;
+                let hashFn = opts?.tileHash;
 
-                // Get neighbor heights for 3D edge rendering
-                const tileSouth = getNeighborType(tx, ty + 1);
-                const tileEast = getNeighborType(tx + 1, ty);
-                const tileNorth = getNeighborType(tx, ty - 1);
-                const tileWest = getNeighborType(tx - 1, ty);
+                if (typeof ctx === "number") {
+                    const txLegacy = ctx;
+                    const tyLegacy = tileType;
+                    resolvedTileType = pixelX;
+                    tileCtx = drawTile._legacyCtx;
+                    if (!tileCtx) {
+                        drawTile._legacyCtx = canvas.getContext("2d");
+                        tileCtx = drawTile._legacyCtx;
+                    }
+                    x = txLegacy * fallbackTileSize;
+                    y = tyLegacy * fallbackTileSize;
+                    tileSize = fallbackTileSize;
+                    tx = txLegacy;
+                    ty = tyLegacy;
+                    t = G ? G.time : 0;
+                    getN = (dx, dy) => getNeighborType(txLegacy + dx, tyLegacy + dy);
+                    getDecoration = window.RSERender?.getTerrainDecoration;
+                    hashFn = (ix, iy, seed = 0) => {
+                        const sx = ix + ((seed | 0) * 17);
+                        const sy = iy + ((seed | 0) * 31);
+                        return tileHash(sx, sy);
+                    };
+                } else {
+                    if (tx == null) tx = ((pixelX / tileSize) | 0);
+                    if (ty == null) ty = ((pixelY / tileSize) | 0);
+                    if (!getN) getN = () => 2;
+                    if (!getDecoration) getDecoration = window.RSERender?.getTerrainDecoration;
+                }
+
+                if (!tileCtx) return;
+
+                function h(seed) {
+                    if (typeof hashFn === "function") {
+                        const v = hashFn(tx, ty, seed | 0);
+                        if (typeof v === "number" && Number.isFinite(v)) {
+                            const clamped = v < 0 ? 0 : v > 1 ? 1 : v;
+                            return clamped;
+                        }
+                    }
+                    let n =
+                        ((tx * 73856093) ^ (ty * 19349663) ^ ((seed | 0) * 83492791)) |
+                        0;
+                    n = (n ^ (n >>> 13)) * 1274126177;
+                    n = n ^ (n >>> 16);
+                    return (n >>> 0) / 4294967295;
+                }
+
+                const myH = TILE_HEIGHT[resolvedTileType] || 1;
+                const tileNorth = getN(0, -1);
+                const tileSouth = getN(0, 1);
+                const tileEast = getN(1, 0);
+                const tileWest = getN(-1, 0);
+                const hN = TILE_HEIGHT[tileNorth] || 1;
                 const hS = TILE_HEIGHT[tileSouth] || 1;
                 const hE = TILE_HEIGHT[tileEast] || 1;
-                const hN = TILE_HEIGHT[tileNorth] || 1;
                 const hW = TILE_HEIGHT[tileWest] || 1;
                 const terrainDecoration =
-                    window.RSERender?.getTerrainDecoration?.(
-                        tileType,
+                    getDecoration?.(
+                        resolvedTileType,
                         {
                             north: tileNorth,
                             south: tileSouth,
                             east: tileEast,
                             west: tileWest,
                         },
-                        h,
+                        h(3),
                     ) || null;
-                const edgeDepth = 5; // pixels per height unit for cliff faces
 
-                if (tileType === 0) {
-                    // Grass
-                    const g = 80 + h * 30;
-                    ctx.fillStyle = `rgb(${(30 + h * 15) | 0},${g | 0},${(25 + h * 10) | 0})`;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    // Light gradient: top-left brighter
-                    const grad = ctx.createLinearGradient(
-                        x,
-                        y,
-                        x + TILE,
-                        y + TILE,
-                    );
-                    grad.addColorStop(0, "rgba(255,255,200,0.06)");
-                    grad.addColorStop(1, "rgba(0,0,20,0.06)");
-                    ctx.fillStyle = grad;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    // Grass tufts
-                    if (h > 0.5) {
-                        ctx.strokeStyle = `rgba(${(15 + h * 20) | 0},${(55 + h * 45) | 0},${(12 + h * 12) | 0},0.6)`;
-                        ctx.lineWidth = 0.7;
-                        const bx = x + h * 20 + 4,
-                            by1 = y + (1 - h) * 18 + 6;
-                        ctx.beginPath();
-                        ctx.moveTo(bx, by1 + 7);
-                        ctx.lineTo(bx + 1, by1);
-                        ctx.stroke();
-                        ctx.beginPath();
-                        ctx.moveTo(bx + 4, by1 + 6);
-                        ctx.lineTo(bx + 3, by1 + 1);
-                        ctx.stroke();
-                        if (h > 0.75) {
-                            ctx.beginPath();
-                            ctx.moveTo(bx + 9, by1 + 8);
-                            ctx.lineTo(bx + 10, by1 + 2);
-                            ctx.stroke();
-                        }
+                // ------------- Warcraft 3 style base painting -------------
+                if (resolvedTileType === 0) {
+                    // Lush grass
+                    const baseShade = (56 + h(5) * 16) | 0;
+                    tileCtx.fillStyle = `rgb(${(44 + h(7) * 10) | 0},${baseShade + 54},${(34 + h(9) * 8) | 0})`;
+                    tileCtx.fillRect(x, y, tileSize, tileSize);
+
+                    const topBandX = x + 3 + ((h(111) * 6) | 0);
+                    const topBandW = 12 + ((h(112) * 11) | 0);
+                    const topBandH = 2 + ((h(113) * 2) | 0);
+                    tileCtx.fillStyle = `rgba(170,230,120,${0.04 + h(114) * 0.04})`;
+                    tileCtx.fillRect(topBandX, y + 1, topBandW, topBandH);
+
+                    const topBandX2 = x + 2 + ((h(115) * 10) | 0);
+                    const topBandW2 = 8 + ((h(116) * 8) | 0);
+                    tileCtx.fillStyle = `rgba(205,245,150,${0.02 + h(117) * 0.03})`;
+                    tileCtx.fillRect(topBandX2, y + 4, topBandW2, 1);
+
+                    const bottomShadeX = x + 2 + ((h(118) * 8) | 0);
+                    const bottomShadeW = 14 + ((h(119) * 12) | 0);
+                    tileCtx.fillStyle = `rgba(10,35,8,${0.03 + h(120) * 0.04})`;
+                    tileCtx.fillRect(bottomShadeX, y + tileSize - 4, bottomShadeW, 3);
+
+                    // 2-3 grass tufts (deterministic)
+                    tileCtx.strokeStyle = "rgba(36,95,32,0.55)";
+                    tileCtx.lineWidth = 0.8;
+                    const tuftCount = h(11) > 0.55 ? 3 : 2;
+                    for (let i = 0; i < tuftCount; i++) {
+                        const sx = x + 4 + ((h(20 + i) * 24) | 0);
+                        const sy = y + 10 + ((h(30 + i) * 16) | 0);
+                        tileCtx.beginPath();
+                        tileCtx.moveTo(sx, sy + 4);
+                        tileCtx.lineTo(sx + 1, sy - 2);
+                        tileCtx.stroke();
                     }
-                } else if (tileType === 1) {
-                    // Dirt
-                    const b = 85 + h * 35;
-                    ctx.fillStyle = `rgb(${(b + 22) | 0},${(b + 2) | 0},${(b - 18) | 0})`;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    // Pebbles/speckles
-                    ctx.fillStyle = `rgba(80,70,55,${0.2 + h * 0.15})`;
-                    ctx.fillRect(x + h * 14 + 2, y + (1 - h) * 10 + 4, 2, 2);
-                    ctx.fillRect(x + (1 - h) * 18 + 3, y + h * 16 + 2, 3, 2);
-                    ctx.fillRect(x + h * 8 + 10, y + h * 22, 2, 1);
-                    // Crack
-                    ctx.strokeStyle = "rgba(50,40,30,0.25)";
-                    ctx.lineWidth = 0.5;
-                    ctx.beginPath();
-                    ctx.moveTo(x + h * 12 + 6, y + 8);
-                    ctx.lineTo(x + h * 10 + 12, y + 24);
-                    ctx.stroke();
-                } else if (tileType === 2) {
-                    // Water (low, sits in basin)
-                    const wave = Math.sin(t * 1.5 + tx * 0.5 + ty * 0.3) * 0.15;
-                    const wb = 55 + wave * 35;
-                    ctx.fillStyle = `rgb(${(12 + wave * 8) | 0},${(35 + wb * 0.4) | 0},${(75 + wb) | 0})`;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    // Depth gradient (darker center)
-                    const wg = ctx.createRadialGradient(
-                        x + TILE / 2,
-                        y + TILE / 2,
+
+                    // Flowers / stones
+                    if (h(44) > 0.72) {
+                        tileCtx.fillStyle = h(45) > 0.5 ? "#f7ef9a" : "#f3f2ff";
+                        tileCtx.fillRect(
+                            x + 6 + ((h(46) * 18) | 0),
+                            y + 7 + ((h(47) * 18) | 0),
+                            2,
+                            2,
+                        );
+                    }
+                    if (h(48) > 0.64) {
+                        tileCtx.fillStyle = "rgba(118,126,114,0.75)";
+                        tileCtx.fillRect(
+                            x + 5 + ((h(49) * 20) | 0),
+                            y + 10 + ((h(50) * 14) | 0),
+                            2,
+                            2,
+                        );
+                    }
+
+                    // Tiny pixel shrub accents instead of bubble-like round background crowns
+                    if (h(777) < 0.1) {
+                        const tx0 = x + 7 + ((h(780) * 16) | 0);
+                        const ty0 = y + 10 + ((h(781) * 12) | 0);
+                        tileCtx.fillStyle = "rgba(82,120,58,0.2)";
+                        tileCtx.fillRect(tx0, ty0 + 4, 5, 2);
+                        tileCtx.fillStyle = "#5f8f46";
+                        tileCtx.fillRect(tx0 + 1, ty0 + 1, 3, 3);
+                        tileCtx.fillStyle = "#7db560";
+                        tileCtx.fillRect(tx0 + 2, ty0, 1, 1);
+                    }
+                } else if (resolvedTileType === 1) {
+                    // Warm dirt path with wear and blended edges
+                    const warm = (130 + h(60) * 18) | 0;
+                    tileCtx.fillStyle = `rgb(${warm + 8},${warm - 18},${warm - 36})`;
+                    tileCtx.fillRect(x, y, tileSize, tileSize);
+
+                    tileCtx.fillStyle = "rgba(72,52,34,0.2)";
+                    tileCtx.fillRect(x, y + tileSize - 5, tileSize, 5);
+                    tileCtx.fillStyle = "rgba(165,126,86,0.13)";
+                    tileCtx.fillRect(x, y, tileSize, 4);
+
+                    // Wheel ruts
+                    tileCtx.strokeStyle = "rgba(88,60,36,0.35)";
+                    tileCtx.lineWidth = 1;
+                    const r1 = y + 10 + ((h(61) * 5) | 0);
+                    const r2 = y + 19 + ((h(62) * 5) | 0);
+                    tileCtx.beginPath();
+                    tileCtx.moveTo(x + 3, r1);
+                    tileCtx.lineTo(x + tileSize - 3, r1 + 1);
+                    tileCtx.stroke();
+                    tileCtx.beginPath();
+                    tileCtx.moveTo(x + 4, r2);
+                    tileCtx.lineTo(x + tileSize - 2, r2 + 1);
+                    tileCtx.stroke();
+
+                    // Pebbles
+                    tileCtx.fillStyle = "rgba(95,78,58,0.55)";
+                    tileCtx.fillRect(x + 6 + ((h(63) * 18) | 0), y + 8, 2, 2);
+                    tileCtx.fillRect(x + 6 + ((h(64) * 20) | 0), y + 18, 2, 2);
+
+                    // Soft blend into neighboring grass
+                    if (tileNorth === 0) {
+                        tileCtx.fillStyle = "rgba(86,128,62,0.2)";
+                        tileCtx.fillRect(x, y, tileSize, 3);
+                    }
+                    if (tileWest === 0) {
+                        tileCtx.fillStyle = "rgba(86,128,62,0.15)";
+                        tileCtx.fillRect(x, y, 3, tileSize);
+                    }
+                    if (tileSouth === 0) {
+                        tileCtx.fillStyle = "rgba(86,128,62,0.12)";
+                        tileCtx.fillRect(x, y + tileSize - 2, tileSize, 2);
+                    }
+                    if (tileEast === 0) {
+                        tileCtx.fillStyle = "rgba(86,128,62,0.1)";
+                        tileCtx.fillRect(x + tileSize - 2, y, 2, tileSize);
+                    }
+                } else if (resolvedTileType === 2) {
+                    // Animated deep water with subtle waves
+                    const phase = t * 0.022 + tx * 0.35 + ty * 0.21;
+                    const waveA = Math.sin(phase) * 0.5 + 0.5;
+                    const waveB = Math.cos(phase * 0.83 + 1.2) * 0.5 + 0.5;
+                    tileCtx.fillStyle = `rgb(${(22 + waveA * 8) | 0},${(72 + waveB * 20) | 0},${(122 + waveA * 20) | 0})`;
+                    tileCtx.fillRect(x, y, tileSize, tileSize);
+
+                    const depth = tileCtx.createRadialGradient(
+                        x + tileSize * 0.5,
+                        y + tileSize * 0.5,
+                        1,
+                        x + tileSize * 0.5,
+                        y + tileSize * 0.5,
+                        tileSize * 0.72,
+                    );
+                    depth.addColorStop(0, "rgba(8,38,72,0.26)");
+                    depth.addColorStop(1, "rgba(0,10,28,0)");
+                    tileCtx.fillStyle = depth;
+                    tileCtx.fillRect(x, y, tileSize, tileSize);
+
+                    tileCtx.fillStyle = `rgba(132,196,255,${0.08 + waveA * 0.08})`;
+                    tileCtx.fillRect(
+                        x + 4 + ((Math.sin(phase * 1.5) * 4) | 0),
+                        y + 9,
+                        13,
+                        2,
+                    );
+                    tileCtx.fillRect(
+                        x + 11 + ((Math.cos(phase * 1.3) * 3) | 0),
+                        y + 20,
+                        11,
+                        2,
+                    );
+
+                    // Ripple ring
+                    tileCtx.strokeStyle = `rgba(170,215,255,${0.12 + waveB * 0.08})`;
+                    tileCtx.lineWidth = 1;
+                    tileCtx.beginPath();
+                    tileCtx.arc(
+                        x + 10 + ((h(70) * 12) | 0),
+                        y + 10 + ((h(71) * 12) | 0),
+                        2 + waveA * 1.5,
                         0,
-                        x + TILE / 2,
-                        y + TILE / 2,
-                        TILE * 0.7,
+                        Math.PI * 2,
                     );
-                    wg.addColorStop(0, "rgba(0,10,40,0.15)");
-                    wg.addColorStop(1, "rgba(0,0,0,0)");
-                    ctx.fillStyle = wg;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    // Shimmer/ripple
-                    const sx1 = x + 6 + Math.sin(t * 2.2 + tx * 1.1) * 7;
-                    const sy1 = y + 10 + Math.cos(t * 1.8 + ty * 0.9) * 5;
-                    ctx.fillStyle = `rgba(130,190,255,${0.12 + Math.sin(t * 3.5 + h * 6) * 0.08})`;
-                    ctx.beginPath();
-                    ctx.ellipse(sx1, sy1, 4, 1.5, 0.3 + h, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Shore foam where land meets water
-                    const hasLandN =
-                        ty > 0 &&
-                        G.map.tiles[ty - 1]?.[tx] !== 2 &&
-                        G.map.tiles[ty - 1]?.[tx] !== undefined;
-                    const hasLandW = tx > 0 && G.map.tiles[ty]?.[tx - 1] !== 2;
-                    const hasLandS =
-                        ty < MAP_H - 1 &&
-                        G.map.tiles[ty + 1]?.[tx] !== 2 &&
-                        G.map.tiles[ty + 1]?.[tx] !== undefined;
-                    const hasLandE =
-                        tx < MAP_W - 1 && G.map.tiles[ty]?.[tx + 1] !== 2;
-                    if (hasLandN) {
-                        ctx.fillStyle = "rgba(180,220,240,0.3)";
-                        ctx.fillRect(x, y, TILE, 4);
-                        ctx.fillStyle = "rgba(220,240,255,0.15)";
-                        ctx.fillRect(x + 4, y + 1, TILE - 8, 2);
+                    tileCtx.stroke();
+
+                    // Shore foam near land
+                    const nLand = tileNorth !== 2;
+                    const sLand = tileSouth !== 2;
+                    const wLand = tileWest !== 2;
+                    const eLand = tileEast !== 2;
+                    const foamAlpha = 0.16 + 0.08 * waveB;
+                    if (nLand) {
+                        tileCtx.fillStyle = `rgba(215,242,255,${foamAlpha})`;
+                        tileCtx.fillRect(x, y, tileSize, 3);
                     }
-                    if (hasLandS) {
-                        ctx.fillStyle = "rgba(160,200,230,0.2)";
-                        ctx.fillRect(x, y + TILE - 3, TILE, 3);
+                    if (sLand) {
+                        tileCtx.fillStyle = `rgba(175,220,245,${foamAlpha * 0.85})`;
+                        tileCtx.fillRect(x, y + tileSize - 3, tileSize, 3);
                     }
-                    if (hasLandW) {
-                        ctx.fillStyle = "rgba(180,220,240,0.25)";
-                        ctx.fillRect(x, y, 4, TILE);
+                    if (wLand) {
+                        tileCtx.fillStyle = `rgba(205,236,252,${foamAlpha * 0.9})`;
+                        tileCtx.fillRect(x, y, 3, tileSize);
                     }
-                    if (hasLandE) {
-                        ctx.fillStyle = "rgba(160,200,230,0.18)";
-                        ctx.fillRect(x + TILE - 3, y, 3, TILE);
+                    if (eLand) {
+                        tileCtx.fillStyle = `rgba(170,210,240,${foamAlpha * 0.75})`;
+                        tileCtx.fillRect(x + tileSize - 3, y, 3, tileSize);
                     }
-                } else if (tileType === 3) {
-                    // Cliff (tall wall)
-                    ctx.fillStyle = `rgb(${(58 + h * 18) | 0},${(54 + h * 16) | 0},${(50 + h * 14) | 0})`;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    // Rock texture layers
-                    ctx.fillStyle = "rgba(100,95,88,0.2)";
-                    ctx.fillRect(x, y + 2, TILE, 6);
-                    ctx.fillStyle = "rgba(80,75,68,0.15)";
-                    ctx.fillRect(x, y + 12, TILE, 5);
-                    ctx.fillStyle = "rgba(90,85,78,0.18)";
-                    ctx.fillRect(x, y + 22, TILE, 6);
-                    // Top highlight (lit from above-left)
-                    ctx.fillStyle = "rgba(200,195,180,0.18)";
-                    ctx.fillRect(x, y, TILE, 3);
-                    ctx.fillStyle = "rgba(180,175,165,0.12)";
-                    ctx.fillRect(x, y, 3, TILE);
-                    // Bottom/right shadow
-                    ctx.fillStyle = "rgba(0,0,0,0.2)";
-                    ctx.fillRect(x, y + TILE - 4, TILE, 4);
-                    ctx.fillStyle = "rgba(0,0,0,0.15)";
-                    ctx.fillRect(x + TILE - 3, y, 3, TILE);
+                } else if (resolvedTileType === 3) {
+                    // Dramatic cliff top
+                    const rock = (82 + h(82) * 18) | 0;
+                    tileCtx.fillStyle = `rgb(${rock + 8},${rock},${rock - 10})`;
+                    tileCtx.fillRect(x, y, tileSize, tileSize);
+
+                    // Layered stone bands
+                    tileCtx.fillStyle = "rgba(130,116,98,0.22)";
+                    tileCtx.fillRect(x, y + 4, tileSize, 4);
+                    tileCtx.fillStyle = "rgba(94,82,70,0.2)";
+                    tileCtx.fillRect(x, y + 13, tileSize, 3);
+                    tileCtx.fillStyle = "rgba(120,104,88,0.2)";
+                    tileCtx.fillRect(x, y + 22, tileSize, 4);
+
+                    // Highlight north/west and shadow south/east for top face
+                    tileCtx.fillStyle = "rgba(220,208,180,0.2)";
+                    tileCtx.fillRect(x, y, tileSize, 3);
+                    tileCtx.fillRect(x, y, 3, tileSize);
+                    tileCtx.fillStyle = "rgba(0,0,0,0.24)";
+                    tileCtx.fillRect(x, y + tileSize - 4, tileSize, 4);
+                    tileCtx.fillRect(x + tileSize - 4, y, 4, tileSize);
+
                     // Cracks
-                    ctx.strokeStyle = "rgba(35,30,25,0.35)";
-                    ctx.lineWidth = 0.7;
-                    ctx.beginPath();
-                    ctx.moveTo(x + h * 16 + 4, y + 3);
-                    ctx.lineTo(x + h * 12 + 8, y + TILE - 3);
-                    ctx.stroke();
-                    if (h > 0.5) {
-                        ctx.beginPath();
-                        ctx.moveTo(x + 20, y + h * 10 + 5);
-                        ctx.lineTo(x + 28, y + h * 10 + 18);
-                        ctx.stroke();
+                    tileCtx.strokeStyle = "rgba(44,34,28,0.45)";
+                    tileCtx.lineWidth = 0.8;
+                    tileCtx.beginPath();
+                    tileCtx.moveTo(x + 5 + ((h(83) * 8) | 0), y + 3);
+                    tileCtx.lineTo(x + 10 + ((h(84) * 10) | 0), y + tileSize - 4);
+                    tileCtx.stroke();
+                    if (h(85) > 0.45) {
+                        tileCtx.beginPath();
+                        tileCtx.moveTo(x + 18, y + 8 + ((h(86) * 6) | 0));
+                        tileCtx.lineTo(x + 27, y + 20 + ((h(87) * 6) | 0));
+                        tileCtx.stroke();
                     }
-                } else if (tileType === 4) {
-                    // Forest (slightly elevated)
-                    const g = 68 + h * 28;
-                    ctx.fillStyle = `rgb(${(18 + h * 10) | 0},${(g * 0.65) | 0},${(15 + h * 8) | 0})`;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    // Shadow on ground from canopy
-                    ctx.fillStyle = "rgba(0,0,0,0.2)";
-                    ctx.beginPath();
-                    ctx.ellipse(x + 18, y + 22, 12, 8, 0.2, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Tree trunk (3D: slight side shading)
-                    ctx.fillStyle = "#4a3520";
-                    ctx.fillRect(x + 13, y + 14, 5, 11);
-                    ctx.fillStyle = "#3a2818";
-                    ctx.fillRect(x + 16, y + 14, 2, 11); // dark side
-                    // Canopy (layered 3D spheres with highlight)
-                    const cx1 = x + 15,
-                        cy1 = y + 9;
-                    ctx.fillStyle = `rgb(${(18 + h * 10) | 0},${(50 + h * 25) | 0},${(12 + h * 8) | 0})`;
-                    ctx.beginPath();
-                    ctx.arc(cx1, cy1 + 1, 11, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.fillStyle = `rgb(${(25 + h * 12) | 0},${(62 + h * 28) | 0},${(18 + h * 10) | 0})`;
-                    ctx.beginPath();
-                    ctx.arc(cx1 - 2, cy1 - 1, 8, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.fillStyle = `rgb(${(32 + h * 10) | 0},${(72 + h * 22) | 0},${(22 + h * 8) | 0})`;
-                    ctx.beginPath();
-                    ctx.arc(cx1 + 3, cy1 + 2, 6, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Canopy highlight (top-left light)
-                    ctx.fillStyle = "rgba(180,255,150,0.12)";
-                    ctx.beginPath();
-                    ctx.arc(cx1 - 4, cy1 - 4, 5, 0, Math.PI * 2);
-                    ctx.fill();
-                } else if (tileType === 5) {
-                    // High ground (elevated plateau)
-                    const g = 92 + h * 32;
-                    ctx.fillStyle = `rgb(${(38 + h * 14) | 0},${g | 0},${(32 + h * 12) | 0})`;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    // Top surface light gradient
-                    const grad = ctx.createLinearGradient(
-                        x,
-                        y,
-                        x + TILE,
-                        y + TILE,
-                    );
-                    grad.addColorStop(0, "rgba(220,255,200,0.08)");
-                    grad.addColorStop(1, "rgba(0,0,0,0.05)");
-                    ctx.fillStyle = grad;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    // Grass on high ground
-                    if (h > 0.55) {
-                        ctx.strokeStyle = `rgba(${(30 + h * 15) | 0},${(75 + h * 30) | 0},${(20 + h * 10) | 0},0.5)`;
-                        ctx.lineWidth = 0.6;
-                        const bx2 = x + h * 18 + 5,
-                            by2 = y + (1 - h) * 16 + 8;
-                        ctx.beginPath();
-                        ctx.moveTo(bx2, by2 + 5);
-                        ctx.lineTo(bx2 + 1, by2);
-                        ctx.stroke();
+                } else if (resolvedTileType === 4) {
+                    // Dense resource forest (dark, packed, blockier canopies)
+                    tileCtx.fillStyle = "#16361a";
+                    tileCtx.fillRect(x, y, tileSize, tileSize);
+
+                    // Subtle trunk shadows
+                    tileCtx.fillStyle = "rgba(0,0,0,0.24)";
+                    tileCtx.fillRect(x + 7, y + 21, 6, 4);
+                    tileCtx.fillRect(x + 16, y + 23, 6, 4);
+
+                    // 2-3 overlapping blocky canopies filling most of tile
+                    tileCtx.fillStyle = "#1a4a1a";
+                    tileCtx.fillRect(x + 3, y + 7, 13, 10);
+                    tileCtx.fillStyle = "#225423";
+                    tileCtx.fillRect(x + 14, y + 8, 13, 11);
+                    if (h(93) > 0.38) {
+                        tileCtx.fillStyle = "#2a5a20";
+                        tileCtx.fillRect(x + 10, y + 3, 10, 7);
                     }
+                    tileCtx.fillStyle = "rgba(170,220,145,0.1)";
+                    tileCtx.fillRect(x + 6, y + 5, 6, 2);
+                    tileCtx.fillRect(x + 17, y + 6, 5, 2);
+                } else if (resolvedTileType === 5) {
+                    // Elevated strategic high ground, golden-green tint
+                    const g = (136 + h(101) * 18) | 0;
+                    tileCtx.fillStyle = `rgb(${(72 + h(102) * 12) | 0},${g},${(52 + h(103) * 10) | 0})`;
+                    tileCtx.fillRect(x, y, tileSize, tileSize);
+
+                    // Distinct edge markings
+                    tileCtx.fillStyle = "rgba(230,248,170,0.2)";
+                    tileCtx.fillRect(x, y, tileSize, 3);
+                    tileCtx.fillRect(x, y, 3, tileSize);
+                    tileCtx.fillStyle = "rgba(24,42,18,0.22)";
+                    tileCtx.fillRect(x, y + tileSize - 3, tileSize, 3);
+                    tileCtx.fillRect(x + tileSize - 3, y, 3, tileSize);
+
+                    // Sparse golden flowers / bright grass
+                    if (h(104) > 0.5) {
+                        tileCtx.fillStyle = "rgba(248,215,108,0.85)";
+                        tileCtx.fillRect(x + 8 + ((h(105) * 14) | 0), y + 8 + ((h(106) * 14) | 0), 2, 2);
+                    }
+                    tileCtx.strokeStyle = "rgba(86,130,50,0.45)";
+                    tileCtx.lineWidth = 0.8;
+                    tileCtx.beginPath();
+                    tileCtx.moveTo(x + 7 + ((h(107) * 16) | 0), y + 21);
+                    tileCtx.lineTo(x + 8 + ((h(108) * 16) | 0), y + 15);
+                    tileCtx.stroke();
                 }
 
+                // Keep integration with render.js terrain decoration
                 if (terrainDecoration?.hasRockBands) {
-                    ctx.fillStyle = `rgba(120,105,88,${terrainDecoration.rockBandAlpha})`;
-                    ctx.fillRect(x + 2, y + 5 + h * 4, TILE - 4, 3);
-                    ctx.fillStyle = `rgba(70,60,50,${terrainDecoration.rockBandAlpha * 0.9})`;
-                    ctx.fillRect(x + 4, y + 18, TILE - 8, 2);
+                    tileCtx.fillStyle = `rgba(124,106,86,${terrainDecoration.rockBandAlpha})`;
+                    tileCtx.fillRect(x + 2, y + 6, tileSize - 4, 2);
+                    tileCtx.fillStyle = `rgba(78,64,50,${terrainDecoration.rockBandAlpha * 0.9})`;
+                    tileCtx.fillRect(x + 4, y + 18, tileSize - 8, 2);
                 }
                 if (terrainDecoration?.hasDustOverlay) {
-                    const dust = ctx.createLinearGradient(
+                    const dust = tileCtx.createLinearGradient(
                         x,
-                        y + TILE * 0.2,
+                        y + tileSize * 0.25,
                         x,
-                        y + TILE,
+                        y + tileSize,
                     );
-                    dust.addColorStop(0, "rgba(215,185,120,0)");
+                    dust.addColorStop(0, "rgba(218,190,126,0)");
                     dust.addColorStop(
                         1,
-                        `rgba(125,82,38,${terrainDecoration.dustStrength})`,
+                        `rgba(126,86,46,${terrainDecoration.dustStrength})`,
                     );
-                    ctx.fillStyle = dust;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    ctx.fillStyle = `rgba(88,66,40,${terrainDecoration.dustStrength * 0.85})`;
-                    ctx.fillRect(x + 4 + h * 6, y + 21, 4, 2);
-                    ctx.fillRect(x + 16, y + 24 - h * 5, 3, 2);
+                    tileCtx.fillStyle = dust;
+                    tileCtx.fillRect(x, y, tileSize, tileSize);
                 }
                 if (terrainDecoration?.hasCliffShadow) {
-                    const cliffShadow = ctx.createLinearGradient(
+                    const cliffShadow = tileCtx.createLinearGradient(
                         x,
-                        y + TILE * 0.35,
-                        x + TILE,
-                        y + TILE,
+                        y + tileSize * 0.35,
+                        x + tileSize,
+                        y + tileSize,
                     );
                     cliffShadow.addColorStop(0, "rgba(0,0,0,0)");
                     cliffShadow.addColorStop(
                         1,
                         `rgba(24,14,4,${terrainDecoration.shadowOpacity})`,
                     );
-                    ctx.fillStyle = cliffShadow;
-                    ctx.fillRect(x, y, TILE, TILE);
-                    ctx.fillStyle = `rgba(230,220,180,${terrainDecoration.ridgeStrength * 0.35})`;
-                    ctx.fillRect(x + 1, y + 1, TILE - 2, 2);
+                    tileCtx.fillStyle = cliffShadow;
+                    tileCtx.fillRect(x, y, tileSize, tileSize);
+                    tileCtx.fillStyle = `rgba(232,224,186,${terrainDecoration.ridgeStrength * 0.32})`;
+                    tileCtx.fillRect(x + 1, y + 1, tileSize - 2, 2);
                 }
 
-                // === 3D ELEVATION EDGES ===
-                // South edge: if this tile is higher than the south neighbor, draw a cliff face below
+                // ------------- Height-based walls/shadows -------------
+                const edgeDepth = 5;
                 if (myH > hS) {
-                    const diff = Math.min(myH - hS, 2);
+                    const diff = Math.min(myH - hS, 2.2);
                     const wallH = diff * edgeDepth;
-                    // Cliff face (dark, visible "wall")
-                    const baseColor =
-                        tileType === 3
-                            ? [50, 45, 40]
-                            : tileType === 5
-                              ? [35, 55, 30]
-                              : [40, 50, 35];
-                    ctx.fillStyle = `rgb(${baseColor[0]},${baseColor[1]},${baseColor[2]})`;
-                    ctx.fillRect(x, y + TILE, TILE, wallH);
-                    // Darker bottom edge of wall
-                    ctx.fillStyle = "rgba(0,0,0,0.2)";
-                    ctx.fillRect(x, y + TILE + wallH - 2, TILE, 2);
-                    // Light on top of wall
-                    ctx.fillStyle = "rgba(200,200,180,0.1)";
-                    ctx.fillRect(x, y + TILE, TILE, 2);
+                    tileCtx.fillStyle = "rgba(25,28,20,0.58)";
+                    tileCtx.fillRect(x, y + tileSize, tileSize, wallH);
+                    tileCtx.fillStyle = "rgba(0,0,0,0.22)";
+                    tileCtx.fillRect(x, y + tileSize + wallH - 2, tileSize, 2);
+                    tileCtx.fillStyle = "rgba(210,200,170,0.12)";
+                    tileCtx.fillRect(x, y + tileSize, tileSize, 1);
                 }
-
-                // East edge: if this tile is higher than the east neighbor, draw a side wall
                 if (myH > hE) {
-                    const diff = Math.min(myH - hE, 2);
-                    const wallH = diff * edgeDepth;
-                    const baseColor =
-                        tileType === 3
-                            ? [40, 36, 32]
-                            : tileType === 5
-                              ? [28, 45, 24]
-                              : [32, 42, 28];
-                    ctx.fillStyle = `rgb(${baseColor[0]},${baseColor[1]},${baseColor[2]})`;
-                    ctx.fillRect(x + TILE, y, wallH, TILE);
-                    // Darker edge
-                    ctx.fillStyle = "rgba(0,0,0,0.15)";
-                    ctx.fillRect(x + TILE + wallH - 1, y, 1, TILE);
+                    const diff = Math.min(myH - hE, 2.2);
+                    const wallW = diff * edgeDepth;
+                    tileCtx.fillStyle = "rgba(18,22,16,0.5)";
+                    tileCtx.fillRect(x + tileSize, y, wallW, tileSize);
+                    tileCtx.fillStyle = "rgba(0,0,0,0.2)";
+                    tileCtx.fillRect(x + tileSize + wallW - 1, y, 1, tileSize);
                 }
 
-                // North highlight: if this tile is higher than north neighbor, top edge gets bright line
+                // Bright north/west ridge when this tile is higher
                 if (myH > hN) {
-                    ctx.fillStyle = "rgba(230,255,220,0.12)";
-                    ctx.fillRect(x, y, TILE, 2);
+                    tileCtx.fillStyle = "rgba(232,255,206,0.16)";
+                    tileCtx.fillRect(x, y, tileSize, 2);
                 }
-
-                // West highlight: if this tile is higher than west neighbor
                 if (myH > hW) {
-                    ctx.fillStyle = "rgba(210,240,200,0.08)";
-                    ctx.fillRect(x, y, 2, TILE);
+                    tileCtx.fillStyle = "rgba(220,246,190,0.12)";
+                    tileCtx.fillRect(x, y, 2, tileSize);
                 }
 
-                // Drop shadow on lower tiles near tall neighbors
-                const hNorth = TILE_HEIGHT[getNeighborType(tx, ty - 1)] || 1;
-                const hWest = TILE_HEIGHT[getNeighborType(tx - 1, ty)] || 1;
-                if (hNorth > myH) {
-                    const sd = Math.min(hNorth - myH, 2) * 3;
-                    const sg = ctx.createLinearGradient(x, y, x, y + sd);
-                    sg.addColorStop(0, "rgba(0,0,10,0.22)");
-                    sg.addColorStop(1, "rgba(0,0,10,0)");
-                    ctx.fillStyle = sg;
-                    ctx.fillRect(x, y, TILE, sd);
+                // North edge of short tile next to taller tile: highlight strip
+                if (hN > myH) {
+                    tileCtx.fillStyle = "rgba(204,194,150,0.12)";
+                    tileCtx.fillRect(x, y, tileSize, 2);
                 }
-                if (hWest > myH) {
-                    const sd = Math.min(hWest - myH, 2) * 3;
-                    const sg = ctx.createLinearGradient(x, y, x + sd, y);
-                    sg.addColorStop(0, "rgba(0,0,10,0.18)");
+
+                // Cast shadows from taller north/west neighbors
+                if (hN > myH) {
+                    const sd = Math.min(2.5, hN - myH) * 3;
+                    const sg = tileCtx.createLinearGradient(x, y, x, y + sd);
+                    sg.addColorStop(0, "rgba(0,0,12,0.24)");
+                    sg.addColorStop(1, "rgba(0,0,12,0)");
+                    tileCtx.fillStyle = sg;
+                    tileCtx.fillRect(x, y, tileSize, sd);
+                }
+                if (hW > myH) {
+                    const sd = Math.min(2.5, hW - myH) * 3;
+                    const sg = tileCtx.createLinearGradient(x, y, x + sd, y);
+                    sg.addColorStop(0, "rgba(0,0,10,0.2)");
                     sg.addColorStop(1, "rgba(0,0,10,0)");
-                    ctx.fillStyle = sg;
-                    ctx.fillRect(x, y, sd, TILE);
+                    tileCtx.fillStyle = sg;
+                    tileCtx.fillRect(x, y, sd, tileSize);
                 }
             }
 
@@ -3848,6 +3951,19 @@
                 mctx.fillRect(0, 0, mw, mh);
                 const scaleX = mw / MAP_W,
                     scaleY = mh / MAP_H;
+                const MINI_TILE_COLORS = {
+                    0: "#4f9c45", // grass
+                    1: "#9a7653", // dirt
+                    2: "#1f4f8a", // water
+                    3: "#3e3d3a", // cliff
+                    4: "#1e4a1f", // forest
+                    5: "#7faa43", // high ground
+                };
+                const MINI_RESOURCE_COLORS = {
+                    gold: "#f3d24a",
+                    food: "#c8b56a",
+                    wood: "#1f5a2a",
+                };
 
                 // Tiles
                 const mmFog = G.isMultiplayer ? myFog() : G.map.fogPlayer;
@@ -3857,7 +3973,9 @@
                         if (fog === FOG_UNEXPLORED) continue;
                         const tile = G.map.tiles[ty][tx];
                         mctx.fillStyle =
-                            fog === FOG_VISIBLE ? TILE_COLORS[tile] : "#2d3440";
+                            fog === FOG_VISIBLE
+                                ? MINI_TILE_COLORS[tile] || "#2d3440"
+                                : "#2d3440";
                         mctx.fillRect(
                             tx * scaleX,
                             ty * scaleY,
@@ -3883,7 +4001,8 @@
                         continue;
                     const fog = mmFog[r.y]?.[r.x];
                     if (!fog) continue;
-                    mctx.fillStyle = RESOURCE_COLORS[r.type];
+                    mctx.fillStyle =
+                        MINI_RESOURCE_COLORS[r.type] || RESOURCE_COLORS[r.type];
                     mctx.fillRect(r.x * scaleX - 1, r.y * scaleY - 1, 3, 3);
                 }
 

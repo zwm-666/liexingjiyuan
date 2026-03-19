@@ -45,6 +45,81 @@
     };
   }
 
+  function getSpriteOpaqueBounds(sprite) {
+    const width = sprite?.naturalWidth || sprite?.width || 0;
+    const height = sprite?.naturalHeight || sprite?.height || 0;
+    const bbox = sprite?.__spriteMeta?.bbox;
+    if (!bbox || width <= 0 || height <= 0) {
+      return { left: 0, top: 0, right: width, bottom: height };
+    }
+    return {
+      left: Math.max(0, Math.min(width, bbox.left ?? 0)),
+      top: Math.max(0, Math.min(height, bbox.top ?? 0)),
+      right: Math.max(0, Math.min(width, bbox.right ?? width)),
+      bottom: Math.max(0, Math.min(height, bbox.bottom ?? height)),
+    };
+  }
+
+  function getBuildingSpriteDrawRect(sprite, bx, by, size, groundMetrics) {
+    const width = sprite?.naturalWidth || sprite?.width || size;
+    const height = sprite?.naturalHeight || sprite?.height || size;
+    const bounds = getSpriteOpaqueBounds(sprite);
+    const drawWidth = size;
+    const drawHeight = size;
+    const scaleX = drawWidth / width;
+    const scaleY = drawHeight / height;
+    const visibleCenterX = ((bounds.left + bounds.right) / 2) * scaleX;
+    const spriteBaseY = by + (groundMetrics?.spriteBaseY || size);
+    return {
+      x: bx + drawWidth / 2 - visibleCenterX,
+      y: spriteBaseY - bounds.bottom * scaleY,
+      width: drawWidth,
+      height: drawHeight,
+    };
+  }
+
+  function getBuildingGroundMetrics(size) {
+    const normalizedSize = Math.max(32, size || 32);
+    return {
+      spriteBaseY: normalizedSize + Math.max(2, Math.round(normalizedSize * 0.05)),
+      shadowCenterY: normalizedSize - Math.max(6, Math.round(normalizedSize * 0.12)),
+      shadowRadiusX: Math.max(12, normalizedSize * 0.36),
+      shadowRadiusY: Math.max(5, normalizedSize * 0.16),
+      shadowOffsetX: Math.max(1, normalizedSize * 0.016),
+      decalCenterY: normalizedSize - Math.max(4, Math.round(normalizedSize * 0.08)),
+      decalRadiusX: Math.max(14, normalizedSize * 0.43),
+      decalRadiusY: Math.max(6, normalizedSize * 0.2),
+      ringRadiusX: Math.max(16, normalizedSize * 0.48),
+      ringRadiusY: Math.max(8, normalizedSize * 0.24),
+    };
+  }
+
+  function drawPixelParticle(ctx, particle) {
+    const lifeAlpha = Math.min(1, particle.life * 1.4);
+    const px = Math.round(particle.x);
+    const py = Math.round(particle.y);
+    const bodySize = Math.max(1, Math.round(particle.size * (0.22 + particle.life * 0.26)));
+    const glowSize = Math.max(bodySize + 1, Math.round(particle.size * 0.45));
+
+    ctx.globalAlpha = lifeAlpha;
+    ctx.fillStyle = particle.color;
+    ctx.fillRect(
+      px - Math.floor(bodySize / 2),
+      py - Math.floor(bodySize / 2),
+      bodySize,
+      bodySize,
+    );
+
+    if (particle.size > 2) {
+      ctx.globalAlpha = lifeAlpha * 0.35;
+      ctx.fillStyle = particle.color;
+      ctx.fillRect(px - glowSize, py, glowSize * 2 + 1, 1);
+      ctx.fillRect(px, py - glowSize, 1, glowSize * 2 + 1);
+    }
+
+    ctx.globalAlpha = 1;
+  }
+
   function createRenderSystem(options) {
     let G = null;
     const getGame = options.getGame;
@@ -87,38 +162,6 @@
     const SpriteLoader =
       options.spriteLoader ||
       (typeof window !== "undefined" ? window.RSESpriteLoader : null);
-
-    function getSpriteOpaqueBounds(sprite) {
-      const width = sprite?.naturalWidth || sprite?.width || 0;
-      const height = sprite?.naturalHeight || sprite?.height || 0;
-      const bbox = sprite?.__spriteMeta?.bbox;
-      if (!bbox || width <= 0 || height <= 0) {
-        return { left: 0, top: 0, right: width, bottom: height };
-      }
-      return {
-        left: Math.max(0, Math.min(width, bbox.left ?? 0)),
-        top: Math.max(0, Math.min(height, bbox.top ?? 0)),
-        right: Math.max(0, Math.min(width, bbox.right ?? width)),
-        bottom: Math.max(0, Math.min(height, bbox.bottom ?? height)),
-      };
-    }
-
-    function getBuildingSpriteDrawRect(sprite, bx, by, size) {
-      const width = sprite?.naturalWidth || sprite?.width || size;
-      const height = sprite?.naturalHeight || sprite?.height || size;
-      const bounds = getSpriteOpaqueBounds(sprite);
-      const drawWidth = size;
-      const drawHeight = size;
-      const scaleX = drawWidth / width;
-      const scaleY = drawHeight / height;
-      const visibleCenterX = ((bounds.left + bounds.right) / 2) * scaleX;
-      return {
-        x: bx + drawWidth / 2 - visibleCenterX,
-        y: by + drawHeight - bounds.bottom * scaleY,
-        width: drawWidth,
-        height: drawHeight,
-      };
-    }
 
     function getEntityFaction(e) {
       if (!G || !G.players) return null;
@@ -185,108 +228,236 @@
           ry = r.y * TILE + TILE / 2;
         const rh = tileHash(r.x, r.y);
 
+        const ratio = r.max > 0 ? Math.max(0, Math.min(1, r.amount / r.max)) : 0;
+        ctx.save();
+        if (fog === FOG_EXPLORED) ctx.globalAlpha = 0.58;
+
         if (r.type === "wood") {
-          // Wood on forest tiles: tree already drawn by drawTile, just show depletion
+          // Wood on forest tiles: base forest is in drawTile; here we render depletion state.
           if (G.map.tiles[r.y]?.[r.x] === 4) {
-            const pct = r.amount / r.max;
-            if (pct < 0.3) {
-              // Fading tree: overlay darkening
-              ctx.fillStyle = `rgba(40,30,20,${0.3 * (1 - pct / 0.3)})`;
+            if (ratio < 0.7) {
+              const heavy = ratio < 0.3;
+              const fade = heavy
+                ? Math.min(1, 1 - ratio / 0.3)
+                : Math.min(1, (0.7 - ratio) / 0.4);
+
+              ctx.fillStyle = `rgba(24,22,16,${0.12 + fade * 0.2})`;
               ctx.fillRect(r.x * TILE, r.y * TILE, TILE, TILE);
+
+              const stumpCount = heavy ? 4 : 2;
+              for (let i = 0; i < stumpCount; i++) {
+                const hx = tileHash(r.x * 3 + i + 11, r.y * 5 + i + 17);
+                const hy = tileHash(r.x * 7 + i + 3, r.y * 2 + i + 29);
+                const sx = r.x * TILE + 6 + hx * 20;
+                const sy = r.y * TILE + 18 + hy * 10;
+                ctx.fillStyle = "#5a3b22";
+                ctx.fillRect(sx - 2, sy - 2, 4, 4);
+                ctx.fillStyle = "#7a5a34";
+                ctx.beginPath();
+                ctx.ellipse(sx, sy - 1, 3.2, 1.8, 0, 0, Math.PI * 2);
+                ctx.fill();
+              }
+
+              const remainClusters = heavy ? 1 : 2;
+              for (let i = 0; i < remainClusters; i++) {
+                const hx = tileHash(r.x * 9 + i + 41, r.y * 11 + i + 7);
+                const hy = tileHash(r.x * 5 + i + 19, r.y * 13 + i + 23);
+                const tx = r.x * TILE + 8 + hx * 16;
+                const ty = r.y * TILE + 10 + hy * 8;
+                const crownW = heavy ? 5 : 8;
+                const crownH = heavy ? 4 : 6;
+                ctx.fillStyle = heavy ? "#1f4f24" : "#1d5a28";
+                ctx.beginPath();
+                ctx.ellipse(tx, ty, crownW, crownH, 0, 0, Math.PI * 2);
+                ctx.fill();
+              }
             }
           } else {
-            // Standalone wood resource (not on forest tile) — draw tree
-            ctx.fillStyle = "rgba(0,0,0,0.2)";
+            // Standalone wood: denser, darker mini-grove to distinguish from terrain decoration.
+            const treeCount = ratio < 0.3 ? 2 : 3;
+            ctx.fillStyle = "rgba(0,0,0,0.22)";
             ctx.beginPath();
-            ctx.ellipse(rx + 2, ry + 10, 12, 6, 0, 0, Math.PI * 2);
+            ctx.ellipse(rx + 1, ry + 10, 12, 5, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = "#5a3a1a";
-            ctx.fillRect(rx - 2, ry - 2, 5, 14);
-            ctx.fillStyle = "#1a6a22";
-            ctx.beginPath();
-            ctx.moveTo(rx, ry - 16);
-            ctx.lineTo(rx - 10, ry - 2);
-            ctx.lineTo(rx + 10, ry - 2);
-            ctx.fill();
-            ctx.fillStyle = "#228a2a";
-            ctx.beginPath();
-            ctx.moveTo(rx, ry - 20);
-            ctx.lineTo(rx - 8, ry - 8);
-            ctx.lineTo(rx + 8, ry - 8);
-            ctx.fill();
-            ctx.fillStyle = "#2a9a32";
-            ctx.beginPath();
-            ctx.moveTo(rx, ry - 23);
-            ctx.lineTo(rx - 6, ry - 14);
-            ctx.lineTo(rx + 6, ry - 14);
-            ctx.fill();
+
+            for (let i = 0; i < treeCount; i++) {
+              const hx = tileHash(r.x * 5 + i + 2, r.y * 7 + i + 13);
+              const hy = tileHash(r.x * 11 + i + 17, r.y * 3 + i + 5);
+              const tx = rx - 8 + i * 8 + (hx - 0.5) * 3;
+              const ty = ry + 2 + (hy - 0.5) * 4;
+              ctx.fillStyle = "#4d3218";
+              ctx.fillRect(tx - 1.5, ty - 3, 3, 9);
+
+              ctx.fillStyle = "#174d1d";
+              ctx.beginPath();
+              ctx.moveTo(tx, ty - 12);
+              ctx.lineTo(tx - 8, ty - 2);
+              ctx.lineTo(tx + 8, ty - 2);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.fillStyle = "#1d6125";
+              ctx.beginPath();
+              ctx.moveTo(tx, ty - 16);
+              ctx.lineTo(tx - 6, ty - 7);
+              ctx.lineTo(tx + 6, ty - 7);
+              ctx.closePath();
+              ctx.fill();
+            }
           }
         } else if (r.type === "food") {
-          // Wheat patch
-          ctx.fillStyle = "rgba(0,0,0,0.1)";
-          ctx.beginPath();
-          ctx.ellipse(rx, ry + 8, 10, 5, 0, 0, Math.PI * 2);
-          ctx.fill();
-          const stalks = [
-            [-5, 0],
-            [-2, 1],
-            [1, -1],
-            [4, 0],
-            [7, 1],
-          ];
-          for (const [sx, sy] of stalks) {
-            ctx.strokeStyle = "#b8952a";
-            ctx.lineWidth = 1.5;
+          // Warcraft-like farmland/wheat field tile; food nodes naturally form 2x2 patches.
+          const swayBase = Math.sin(G.time * 0.02 + r.x * 0.5) * 2;
+          const tileLeft = r.x * TILE;
+          const tileTop = r.y * TILE;
+
+          ctx.fillStyle = "rgba(0,0,0,0.14)";
+          ctx.fillRect(tileLeft + 2, tileTop + 5, TILE - 4, TILE - 7);
+
+          ctx.fillStyle = "#8a7040";
+          ctx.fillRect(tileLeft + 3, tileTop + 4, TILE - 6, TILE - 8);
+          ctx.strokeStyle = "rgba(107,82,45,0.7)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(tileLeft + 3.5, tileTop + 4.5, TILE - 7, TILE - 9);
+
+          const rowCount = 4;
+          const colCount = 4;
+          const totalSpots = rowCount * colCount;
+          const visibleSpots = Math.max(0, Math.round(totalSpots * ratio));
+
+          for (let row = 0; row < rowCount; row++) {
+            const rowY = tileTop + 8 + row * 5;
+            const rowShift = (row % 2 === 0 ? -1 : 1) * 0.8;
+
+            ctx.strokeStyle = "rgba(117,96,56,0.65)";
             ctx.beginPath();
-            ctx.moveTo(rx + sx, ry + 6 + sy);
-            ctx.lineTo(rx + sx + rh * 2 - 1, ry - 10 + sy);
+            ctx.moveTo(tileLeft + 5, rowY + 2.5);
+            ctx.lineTo(tileLeft + TILE - 5, rowY + 2.5);
             ctx.stroke();
-            ctx.fillStyle = "#dab030";
-            ctx.beginPath();
-            ctx.ellipse(
-              rx + sx + rh * 2 - 1,
-              ry - 12 + sy,
-              2,
-              4,
-              0.2,
-              0,
-              Math.PI * 2,
-            );
-            ctx.fill();
+
+            for (let col = 0; col < colCount; col++) {
+              const idx = row * colCount + col;
+              if (idx >= visibleSpots) continue;
+
+              const baseX = tileLeft + 7 + col * 6 + rowShift;
+              const phase = row * 0.9 + col * 0.6 + rh * 3.7;
+              const sway = swayBase * (0.6 + row * 0.08) + Math.sin(G.time * 0.018 + phase) * 0.8;
+              const stalkHeight = 7 + ((row + col) % 2);
+
+              ctx.strokeStyle = "#b8a030";
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(baseX, rowY + 2);
+              ctx.lineTo(baseX + sway, rowY - stalkHeight);
+              ctx.stroke();
+
+              ctx.fillStyle = "#d4b840";
+              ctx.beginPath();
+              ctx.ellipse(baseX + sway, rowY - stalkHeight - 1, 1.4, 2.2, 0.15, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = "#e8d060";
+              ctx.beginPath();
+              ctx.ellipse(baseX + sway + 0.8, rowY - stalkHeight - 1.2, 0.8, 1.2, 0.15, 0, Math.PI * 2);
+              ctx.fill();
+            }
           }
+
+          if (ratio < 0.3) {
+            const bareCount = 2 + Math.floor((1 - ratio / 0.3) * 3);
+            for (let i = 0; i < bareCount; i++) {
+              const hx = tileHash(r.x * 13 + i + 5, r.y * 17 + i + 31);
+              const hy = tileHash(r.x * 7 + i + 19, r.y * 3 + i + 11);
+              const bx = tileLeft + 6 + hx * 20;
+              const by = tileTop + 8 + hy * 14;
+              ctx.fillStyle = "#7a6338";
+              ctx.beginPath();
+              ctx.ellipse(bx, by, 3.2, 2.1, 0, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
           ctx.lineWidth = 1;
         } else if (r.type === "gold") {
-          // Rocky mound
-          ctx.fillStyle = "rgba(0,0,0,0.15)";
+          const low = ratio < 0.3;
+          const moundScale = ratio > 0 ? 0.55 + ratio * 0.45 : 0.45;
+          const moundW = 13 * moundScale;
+          const moundH = 11 * moundScale;
+
+          ctx.fillStyle = "rgba(0,0,0,0.2)";
           ctx.beginPath();
-          ctx.ellipse(rx + 2, ry + 8, 14, 6, 0, 0, Math.PI * 2);
+          ctx.ellipse(rx + 1, ry + 9, 14 * moundScale, 5 * moundScale, 0, 0, Math.PI * 2);
           ctx.fill();
-          ctx.fillStyle = "#666058";
+
+          ctx.fillStyle = "#5a5040";
           ctx.beginPath();
-          ctx.moveTo(rx - 12, ry + 6);
-          ctx.lineTo(rx - 6, ry - 8);
-          ctx.lineTo(rx + 2, ry - 10);
-          ctx.lineTo(rx + 8, ry - 6);
-          ctx.lineTo(rx + 12, ry + 6);
+          ctx.moveTo(rx - moundW, ry + 6 * moundScale);
+          ctx.lineTo(rx - moundW * 0.7, ry - moundH * 0.4);
+          ctx.lineTo(rx - moundW * 0.15, ry - moundH);
+          ctx.lineTo(rx + moundW * 0.35, ry - moundH * 0.72);
+          ctx.lineTo(rx + moundW, ry + 6 * moundScale);
           ctx.closePath();
           ctx.fill();
-          ctx.strokeStyle = "#eac020";
-          ctx.lineWidth = 1.5;
+
+          ctx.fillStyle = "rgba(95,86,70,0.65)";
           ctx.beginPath();
-          ctx.moveTo(rx - 4, ry - 2);
-          ctx.lineTo(rx + 2, ry - 6);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(rx + 1, ry + 1);
-          ctx.lineTo(rx + 6, ry - 3);
-          ctx.stroke();
-          ctx.lineWidth = 1;
-          const sp = Math.sin(G.time * 4 + rh * 10) * 0.5 + 0.5;
-          ctx.fillStyle = `rgba(255,220,50,${sp * 0.6})`;
-          ctx.beginPath();
-          ctx.arc(rx + rh * 8 - 4, ry - 4, 2, 0, Math.PI * 2);
+          ctx.moveTo(rx - moundW * 0.7, ry + 3 * moundScale);
+          ctx.lineTo(rx - moundW * 0.15, ry - moundH * 0.55);
+          ctx.lineTo(rx + moundW * 0.25, ry - moundH * 0.3);
+          ctx.lineTo(rx + moundW * 0.6, ry + 3 * moundScale);
+          ctx.closePath();
           ctx.fill();
+
+          const entranceOnLeft = rh < 0.5;
+          const entranceX = entranceOnLeft
+            ? rx - moundW * 0.72
+            : rx + moundW * 0.18;
+          const entranceY = ry + 2 * moundScale;
+          const entranceW = Math.max(4, 6 * moundScale);
+          const entranceH = Math.max(3, 5 * moundScale);
+          ctx.fillStyle = "#241f1a";
+          ctx.beginPath();
+          ctx.moveTo(entranceX, entranceY + entranceH);
+          ctx.lineTo(entranceX, entranceY + 1.6);
+          ctx.quadraticCurveTo(
+            entranceX + entranceW * 0.5,
+            entranceY - entranceH * 0.55,
+            entranceX + entranceW,
+            entranceY + 1.6,
+          );
+          ctx.lineTo(entranceX + entranceW, entranceY + entranceH);
+          ctx.closePath();
+          ctx.fill();
+
+          const veinCount = ratio > 0.7 ? 4 : ratio >= 0.3 ? 2 : ratio > 0 ? 1 : 0;
+          for (let i = 0; i < veinCount; i++) {
+            const hx = tileHash(r.x * 3 + i + 37, r.y * 5 + i + 43);
+            const vy = ry - moundH * 0.65 + i * (moundH * 0.38);
+            const vx1 = rx - moundW * 0.5 + hx * moundW * 0.45;
+            const vx2 = vx1 + moundW * (0.32 + hx * 0.24);
+            ctx.strokeStyle = i % 2 === 0 ? "#ffd700" : "#daa520";
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(vx1, vy);
+            ctx.lineTo(vx2, vy - moundH * 0.2);
+            ctx.stroke();
+          }
+
+          if (!low && ratio > 0) {
+            const sparkleCount = ratio > 0.7 ? 3 : 2;
+            for (let i = 0; i < sparkleCount; i++) {
+              const angle = G.time * 0.05 + rh * 5 + i * 2.2;
+              const sx = rx + Math.cos(angle) * (moundW * 0.55);
+              const sy = ry - moundH * 0.45 + Math.sin(angle * 1.2) * (moundH * 0.35);
+              const twinkle = 0.35 + (Math.sin(G.time * 0.09 + i * 1.4 + rh * 6) * 0.5 + 0.5) * 0.55;
+              ctx.fillStyle = `rgba(255,235,120,${twinkle})`;
+              ctx.fillRect(Math.round(sx), Math.round(sy), 2, 2);
+            }
+          }
+
+          ctx.lineWidth = 1;
         }
+        ctx.restore();
       }
 
       // Draw entities
@@ -357,21 +528,9 @@
         p.prevY = p.y;
       }
 
-      // Draw particles (enhanced)
+      // Draw particles (pixel-style)
       for (const p of G.particles) {
-        ctx.globalAlpha = Math.min(1, p.life * 1.5);
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * (0.5 + p.life * 0.5), 0, Math.PI * 2);
-        ctx.fill();
-        // Glow for larger particles
-        if (p.size > 2) {
-          ctx.fillStyle = p.color + "44";
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size * 1.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.globalAlpha = 1;
+        drawPixelParticle(ctx, p);
       }
 
       // Build mode preview
@@ -441,6 +600,9 @@
         by = e.y - size / 2;
       const cx = e.x,
         cy = e.y;
+      const groundMetrics = getBuildingGroundMetrics(size);
+      const groundShadowY = by + groundMetrics.shadowCenterY;
+      const groundDecalY = by + groundMetrics.decalCenterY;
       const alpha = e.isConstructing
         ? 0.5 + (e.buildProgress / e.buildTime) * 0.5
         : 1;
@@ -448,14 +610,54 @@
 
       ctx.globalAlpha = alpha;
 
-      // Ground shadow
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      // Ground contact decal
+      ctx.fillStyle = flash ? "rgba(255,240,220,0.1)" : "rgba(22,20,8,0.12)";
       ctx.beginPath();
       ctx.ellipse(
-        cx + 4,
-        cy + size / 2 + 2,
-        size / 2 + 4,
-        size / 4,
+        cx,
+        groundDecalY,
+        groundMetrics.decalRadiusX,
+        groundMetrics.decalRadiusY,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+
+      ctx.fillStyle = flash ? "rgba(255,255,255,0.08)" : "rgba(92,72,34,0.08)";
+      ctx.beginPath();
+      ctx.ellipse(
+        cx,
+        groundDecalY - 1,
+        groundMetrics.decalRadiusX * 0.84,
+        groundMetrics.decalRadiusY * 0.72,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+
+      // Ground shadow
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.beginPath();
+      ctx.ellipse(
+        cx + groundMetrics.shadowOffsetX,
+        groundShadowY,
+        groundMetrics.shadowRadiusX,
+        groundMetrics.shadowRadiusY,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(0,0,0,0.12)";
+      ctx.beginPath();
+      ctx.ellipse(
+        cx,
+        groundShadowY - 1,
+        groundMetrics.shadowRadiusX * 0.74,
+        groundMetrics.shadowRadiusY * 0.68,
         0,
         0,
         Math.PI * 2,
@@ -469,7 +671,7 @@
           ? SpriteLoader.getBuildingSprite(faction, e.key)
           : null;
       if (sprite) {
-        const drawRect = getBuildingSpriteDrawRect(sprite, bx, by, size);
+        const drawRect = getBuildingSpriteDrawRect(sprite, bx, by, size, groundMetrics);
         if (flash) {
           ctx.globalAlpha = alpha * 0.6;
           ctx.drawImage(
@@ -613,13 +815,9 @@
         // Smoke
         const sm = Math.sin(G.time * 2) * 3;
         ctx.fillStyle = "rgba(160,155,150,0.3)";
-        ctx.beginPath();
-        ctx.arc(bx + size - 10 + sm, by - 10, 5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(Math.round(bx + size - 12 + sm), by - 12, 6, 4);
         ctx.fillStyle = "rgba(140,135,130,0.2)";
-        ctx.beginPath();
-        ctx.arc(bx + size - 8 + sm * 1.5, by - 18, 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillRect(Math.round(bx + size - 10 + sm * 1.5), by - 19, 5, 3);
         // Roof
         ctx.fillStyle = flash ? "#eee" : "#6a4535";
         ctx.fillRect(bx, by + 6, size, 8);
@@ -809,7 +1007,17 @@
       if (e.selected) {
         ctx.strokeStyle = "#0f0";
         ctx.lineWidth = 2;
-        ctx.strokeRect(bx - 2, by - 2, size + 4, size + 4);
+        ctx.beginPath();
+        ctx.ellipse(
+          cx,
+          groundDecalY,
+          groundMetrics.ringRadiusX,
+          groundMetrics.ringRadiusY,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        ctx.stroke();
         ctx.lineWidth = 1;
         // Rally point
         if (e.rallyPoint && e.owner === myOwner()) {
@@ -817,7 +1025,7 @@
           ctx.lineWidth = 1;
           ctx.setLineDash([6, 4]);
           ctx.beginPath();
-          ctx.moveTo(cx, cy);
+          ctx.moveTo(cx, groundDecalY - 1);
           ctx.lineTo(e.rallyPoint.x, e.rallyPoint.y);
           ctx.stroke();
           ctx.setLineDash([]);
@@ -1423,7 +1631,13 @@
       },
     };
   }
-  const exportsObj = { createRenderSystem, getTerrainDecoration };
+  const exportsObj = {
+    createRenderSystem,
+    getTerrainDecoration,
+    getBuildingGroundMetrics,
+    getBuildingSpriteDrawRect,
+    drawPixelParticle,
+  };
   if (typeof module !== "undefined" && module.exports)
     module.exports = exportsObj;
   global.RSERender = exportsObj;
