@@ -22,10 +22,10 @@
     function isPassable(tx, ty) {
       const G = getGame();
       if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return false;
-      // Check terrain type if tiles exist (2=water, 3=cliff are impassable)
+      // Check terrain type if tiles exist (2=water, 3=cliff, 4=forest are impassable)
       if (G.map.tiles) {
         const t = G.map.tiles[ty]?.[tx];
-        if (t === 2 || t === 3) return false;
+        if (t === 2 || t === 3 || t === 4) return false;
       }
       return !G.map.blocked[ty][tx];
     }
@@ -222,147 +222,127 @@
         return { x: W - 1 - point.x, y: H - 1 - point.y };
       }
 
+      function rotatePoint(point, times) {
+        let x = point.x;
+        let y = point.y;
+        const turns = ((times % 4) + 4) % 4;
+        for (let i = 0; i < turns; i++) {
+          const nextX = W - 1 - y;
+          const nextY = x;
+          x = nextX;
+          y = nextY;
+        }
+        return { x, y };
+      }
+
+      function paintRotationalEllipse(cx, cy, rx, ry, tile) {
+        for (let i = 0; i < 4; i++) {
+          const point = rotatePoint({ x: cx, y: cy }, i);
+          const swapAxes = i % 2 === 1;
+          paintEllipse(point.x, point.y, swapAxes ? ry : rx, swapAxes ? rx : ry, tile);
+        }
+      }
+
+      function paintRotationalCircle(cx, cy, radius, tile) {
+        for (let i = 0; i < 4; i++) {
+          const point = rotatePoint({ x: cx, y: cy }, i);
+          paintCircle(point.x, point.y, radius, tile);
+        }
+      }
+
+      function paintRotationalPath(points, radius, tile) {
+        for (let i = 0; i < 4; i++) {
+          const rotated = points.map((point) => rotatePoint(point, i));
+          paintPath(rotated, radius, tile);
+        }
+      }
+
+      function reserveRotationalOpenArea(cx, cy, radius) {
+        for (let i = 0; i < 4; i++) {
+          const point = rotatePoint({ x: cx, y: cy }, i);
+          reserveOpenArea(point.x, point.y, radius);
+        }
+      }
+
+      function placeRotationalGold(point, amount) {
+        for (let i = 0; i < 4; i++) {
+          const rotated = rotatePoint(point, i);
+          placeGold(rotated.x, rotated.y, amount);
+        }
+      }
+
+      function placeRotationalFood(point) {
+        for (let i = 0; i < 4; i++) {
+          const rotated = rotatePoint(point, i);
+          placeFoodPatch(rotated.x, rotated.y);
+        }
+      }
+
+      function placeRotationalWood(point, pattern) {
+        for (let i = 0; i < 4; i++) {
+          const rotated = rotatePoint(point, i);
+          placeWoodCluster(rotated.x, rotated.y, pattern);
+        }
+      }
+
       function carvePlatform(cx, cy, rx, ry) {
         paintEllipse(cx, cy, rx, ry, 0);
         paintEllipse(cx, cy, Math.max(2, rx - 3), Math.max(2, ry - 3), 0);
       }
 
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-          if (x < 3 || x >= W - 3 || y < 3 || y >= H - 3) {
-            tiles[y][x] = 2;
+      function paintMirroredEllipse(cx, cy, rx, ry, tile) {
+        paintEllipse(cx, cy, rx, ry, tile);
+        const mirrored = mirrorPoint({ x: cx, y: cy });
+        paintEllipse(mirrored.x, mirrored.y, rx, ry, tile);
+      }
+
+      function paintMirroredCircle(cx, cy, radius, tile) {
+        paintCircle(cx, cy, radius, tile);
+        const mirrored = mirrorPoint({ x: cx, y: cy });
+        paintCircle(mirrored.x, mirrored.y, radius, tile);
+      }
+
+      function paintMirroredPath(points, radius, tile) {
+        paintPath(points, radius, tile);
+        const mirroredPoints = points
+          .map((point) => mirrorPoint(point))
+          .reverse();
+        paintPath(mirroredPoints, radius, tile);
+      }
+
+      function reserveOpenArea(cx, cy, radius) {
+        for (let y = cy - radius; y <= cy + radius; y++) {
+          for (let x = cx - radius; x <= cx + radius; x++) {
+            if (!inBounds(x, y)) continue;
+            const dx = x - cx;
+            const dy = y - cy;
+            if (dx * dx + dy * dy <= radius * radius && (tiles[y][x] === 2 || tiles[y][x] === 3 || tiles[y][x] === 4)) {
+              tiles[y][x] = 0;
+            }
           }
         }
       }
 
-      paintEllipse(18, 108, 10, 12, 3);
-      paintEllipse(W - 19, H - 109, 10, 12, 3);
-      paintEllipse(42, 88, 10, 7, 3);
-      paintEllipse(W - 43, H - 89, 10, 7, 3);
-      paintEllipse(46, 34, 11, 7, 3);
-      paintEllipse(W - 47, H - 35, 11, 7, 3);
+      function enforceTerrainSymmetry() {
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            const mirrored = mirrorPoint({ x, y });
+            if (y > mirrored.y || (y === mirrored.y && x > mirrored.x)) continue;
+            tiles[mirrored.y][mirrored.x] = tiles[y][x];
+          }
+        }
+      }
 
-      paintEllipse(64, 64, 18, 15, 3);
-      paintEllipse(64, 64, 12, 10, 5);
-      paintEllipse(50, 58, 5, 4, 5);
-      paintEllipse(78, 70, 5, 4, 5);
-      paintEllipse(24, 92, 5, 4, 5);
-      paintEllipse(W - 25, H - 93, 5, 4, 5);
-
-      const mainBase = { x: 12, y: 12 };
-      const enemyBase = mirrorPoint(mainBase);
-      const naturalA = { x: 28, y: 20 };
-      const naturalB = mirrorPoint(naturalA);
-
-      carvePlatform(mainBase.x, mainBase.y, 13, 11);
-      carvePlatform(enemyBase.x, enemyBase.y, 13, 11);
-      carvePlatform(naturalA.x, naturalA.y, 10, 8);
-      carvePlatform(naturalB.x, naturalB.y, 10, 8);
-
-      paintPath([
-        { x: 12, y: 12 },
-        { x: 20, y: 16 },
-        { x: 28, y: 20 },
-      ], 2, 1);
-      paintPath([
-        { x: 115, y: 115 },
-        { x: 107, y: 111 },
-        { x: 99, y: 107 },
-      ], 2, 1);
-
-      paintPath([
-        { x: 28, y: 20 },
-        { x: 40, y: 30 },
-        { x: 54, y: 42 },
-        { x: 60, y: 54 },
-        { x: 64, y: 58 },
-      ], 2, 1);
-      paintPath([
-        { x: 99, y: 107 },
-        { x: 88, y: 96 },
-        { x: 74, y: 85 },
-        { x: 68, y: 74 },
-        { x: 64, y: 70 },
-      ], 2, 1);
-
-      paintPath([
-        { x: 28, y: 20 },
-        { x: 34, y: 30 },
-        { x: 38, y: 42 },
-        { x: 42, y: 54 },
-        { x: 50, y: 60 },
-        { x: 58, y: 64 },
-      ], 2, 1);
-      paintPath([
-        { x: 99, y: 107 },
-        { x: 93, y: 98 },
-        { x: 89, y: 86 },
-        { x: 85, y: 74 },
-        { x: 78, y: 68 },
-        { x: 70, y: 64 },
-      ], 2, 1);
-
-      paintPath([
-        { x: 24, y: 34 },
-        { x: 30, y: 50 },
-        { x: 40, y: 70 },
-        { x: 54, y: 92 },
-        { x: 72, y: 108 },
-      ], 2, 1);
-      paintPath([
-        { x: 103, y: 93 },
-        { x: 97, y: 77 },
-        { x: 87, y: 57 },
-        { x: 73, y: 35 },
-        { x: 55, y: 19 },
-      ], 2, 1);
-
-      paintPath([
-        { x: 34, y: 24 },
-        { x: 48, y: 26 },
-        { x: 68, y: 34 },
-        { x: 92, y: 50 },
-        { x: 108, y: 72 },
-      ], 2, 1);
-      paintPath([
-        { x: 93, y: 103 },
-        { x: 79, y: 101 },
-        { x: 59, y: 93 },
-        { x: 35, y: 77 },
-        { x: 19, y: 55 },
-      ], 2, 1);
-
-      paintPath([
-        { x: 58, y: 64 },
-        { x: 64, y: 60 },
-        { x: 70, y: 64 },
-      ], 1, 5);
-      paintPath([
-        { x: 62, y: 56 },
-        { x: 64, y: 64 },
-        { x: 66, y: 72 },
-      ], 1, 5);
-
-      const goldNodes = [
-        { x: 19, y: 14, amount: 6500 },
-        { x: 30, y: 24, amount: 5000 },
-        { x: 64, y: 58, amount: 3500 },
-        { x: 20, y: 70, amount: 3000 },
-      ];
+      function isResourceTile(x, y) {
+        return resources.some((resource) => resource.x === x && resource.y === y);
+      }
 
       function placeGold(x, y, amount) {
         if (!inBounds(x, y)) return;
         if (tiles[y][x] === 2 || tiles[y][x] === 3) return;
+        if (isResourceTile(x, y)) return;
         tiles[y][x] = 1;
-        resources.push({ type: 'gold', x, y, amount, max: amount, regen: 0 });
-      }
-
-      for (const node of goldNodes) {
-        placeGold(node.x, node.y, node.amount);
-        const mirrored = mirrorPoint(node);
-        if (mirrored.x !== node.x || mirrored.y !== node.y) {
-          placeGold(mirrored.x, mirrored.y, node.amount);
-        }
+        resources.push({ type: "gold", x, y, amount, max: amount, regen: 0 });
       }
 
       function placeFoodPatch(cx, cy) {
@@ -375,22 +355,13 @@
         for (const [dx, dy] of offsets) {
           const x = cx + dx;
           const y = cy + dy;
-          if (!inBounds(x, y) || tiles[y][x] === 2 || tiles[y][x] === 3) continue;
+          if (!inBounds(x, y)) continue;
+          if (tiles[y][x] === 2 || tiles[y][x] === 3) continue;
+          if (isResourceTile(x, y)) continue;
           tiles[y][x] = 0;
-          resources.push({ type: 'food', x, y, amount: 1500, max: 1500, regen: 0 });
+          resources.push({ type: "food", x, y, amount: 1500, max: 1500, regen: 0 });
         }
       }
-
-      placeFoodPatch(14, 7);
-      placeFoodPatch(7, 14);
-      placeFoodPatch(25, 30);
-      placeFoodPatch(30, 25);
-      placeFoodPatch(62, 67);
-      placeFoodPatch(67, 62);
-      placeFoodPatch(W - 16, H - 9);
-      placeFoodPatch(W - 9, H - 16);
-      placeFoodPatch(W - 27, H - 31);
-      placeFoodPatch(W - 32, H - 26);
 
       const woodPattern = [
         [0, 0],
@@ -405,31 +376,198 @@
         [-2, 0],
         [0, 2],
       ];
-      const woodCenters = [
-        { x: 8, y: 24 },
-        { x: 24, y: 8 },
-        { x: 36, y: 22 },
-        { x: 24, y: 38 },
-        { x: 52, y: 82 },
+
+      const smallWoodPattern = [
+        [0, 0],
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+        [0, 1],
+        [-1, 1],
+        [1, 1],
       ];
 
-      function placeWoodCluster(cx, cy) {
-        for (const [dx, dy] of woodPattern) {
+      function placeWoodCluster(cx, cy, pattern) {
+        const activePattern = pattern || woodPattern;
+        for (const [dx, dy] of activePattern) {
           const x = cx + dx;
           const y = cy + dy;
           if (!inBounds(x, y)) continue;
           if (tiles[y][x] === 2 || tiles[y][x] === 3) continue;
-          if (resources.some((resource) => resource.x === x && resource.y === y)) continue;
+          if (isResourceTile(x, y)) continue;
           tiles[y][x] = 4;
-          resources.push({ type: 'wood', x, y, amount: 150, max: 150, regen: 0.1 });
+          resources.push({ type: "wood", x, y, amount: 150, max: 150, regen: 0.1 });
         }
       }
 
-      for (const center of woodCenters) {
-        placeWoodCluster(center.x, center.y);
-        const mirrored = mirrorPoint(center);
-        placeWoodCluster(mirrored.x, mirrored.y);
+      function placeMirroredGold(point, amount) {
+        placeGold(point.x, point.y, amount);
+        const mirrored = mirrorPoint(point);
+        placeGold(mirrored.x, mirrored.y, amount);
       }
+
+      function placeMirroredFood(point) {
+        placeFoodPatch(point.x, point.y);
+        const mirrored = mirrorPoint(point);
+        placeFoodPatch(mirrored.x - 1, mirrored.y - 1);
+      }
+
+      function placeMirroredWood(point) {
+        for (const [dx, dy] of woodPattern) {
+          const x = point.x + dx;
+          const y = point.y + dy;
+          const mirrored = mirrorPoint({ x, y });
+          if (!inBounds(x, y) || !inBounds(mirrored.x, mirrored.y)) continue;
+          if (tiles[y][x] === 2 || tiles[y][x] === 3) continue;
+          if (tiles[mirrored.y][mirrored.x] === 2 || tiles[mirrored.y][mirrored.x] === 3) continue;
+          if (isResourceTile(x, y) || isResourceTile(mirrored.x, mirrored.y)) continue;
+          tiles[y][x] = 4;
+          tiles[mirrored.y][mirrored.x] = 4;
+          resources.push({ type: "wood", x, y, amount: 150, max: 150, regen: 0.1 });
+          if (mirrored.x !== x || mirrored.y !== y) {
+            resources.push({ type: "wood", x: mirrored.x, y: mirrored.y, amount: 150, max: 150, regen: 0.1 });
+          }
+        }
+      }
+
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          if (x < 3 || x >= W - 3 || y < 3 || y >= H - 3) {
+            tiles[y][x] = 2;
+          }
+        }
+      }
+
+      const center = { x: Math.floor(W / 2), y: Math.floor(H / 2) };
+      const topSpawn = { x: center.x, y: 16 };
+      const topMainMine = { x: center.x, y: 25 };
+      const topExpansion = { x: center.x - 18, y: 12 };
+      const topNearWoodLeft = { x: center.x - 14, y: 20 };
+      const topNearWoodRight = { x: center.x + 14, y: 20 };
+      const topFoodLeft = { x: center.x - 10, y: 21 };
+      const topFoodRight = { x: center.x + 6, y: 21 };
+      const topBuildPocket = { x: center.x, y: 20 };
+
+      const mainRoad = [
+        { x: topSpawn.x, y: topSpawn.y + 8 },
+        { x: topSpawn.x, y: 26 },
+        { x: center.x - 2, y: 40 },
+        { x: center.x, y: 52 },
+      ];
+      const expansionRoad = [
+        { x: topSpawn.x - 6, y: 20 },
+        { x: topSpawn.x - 10, y: 16 },
+        { x: topExpansion.x + 5, y: 13 },
+        { x: topExpansion.x, y: topExpansion.y + 3 },
+      ];
+      const flankRoadWest = [
+        { x: center.x - 9, y: 44 },
+        { x: center.x - 18, y: 51 },
+        { x: center.x - 22, y: 60 },
+        { x: center.x - 18, y: 70 },
+        { x: center.x - 8, y: 78 },
+      ];
+      const flankRoadEast = [
+        { x: center.x + 9, y: 45 },
+        { x: center.x + 17, y: 51 },
+        { x: center.x + 21, y: 61 },
+        { x: center.x + 17, y: 71 },
+        { x: center.x + 8, y: 79 },
+      ];
+      const centerCrossRoad = [
+        { x: center.x - 16, y: center.y },
+        { x: center.x - 7, y: center.y + 1 },
+        { x: center.x, y: center.y },
+        { x: center.x + 7, y: center.y - 1 },
+        { x: center.x + 16, y: center.y },
+      ];
+
+      // Central battlefield: broad open plain with slight strategic high ground core
+      paintEllipse(center.x, center.y, 20, 17, 0);
+      paintEllipse(center.x, center.y, 15, 13, 0);
+      paintEllipse(center.x, center.y - 3, 10, 6, 0);
+      paintEllipse(center.x, center.y + 3, 10, 6, 0);
+      paintEllipse(center.x, center.y, 7, 7, 5);
+      paintEllipse(center.x - 7, center.y, 4, 3, 5);
+      paintEllipse(center.x + 7, center.y, 4, 3, 5);
+      paintEllipse(center.x, center.y - 7, 3, 4, 5);
+      paintEllipse(center.x, center.y + 7, 3, 4, 5);
+
+      // Four start zones and safe building areas between spawn and inner main mine
+      paintRotationalEllipse(topSpawn.x, topSpawn.y, 13, 11, 0);
+      paintRotationalEllipse(topSpawn.x, topSpawn.y + 9, 14, 10, 0);
+      paintRotationalEllipse(topBuildPocket.x, topBuildPocket.y, 9, 6, 0);
+      paintRotationalEllipse(topMainMine.x, topMainMine.y, 7, 6, 0);
+      paintRotationalEllipse(topMainMine.x, topMainMine.y - 6, 10, 7, 0);
+
+      // Main roads from each start to center
+      paintRotationalPath(mainRoad, 3, 1);
+      paintPath(centerCrossRoad, 3, 1);
+
+      // Outer expansion branch roads
+      paintRotationalPath(expansionRoad, 2, 1);
+
+      // Side paths for flanking around the center
+      paintRotationalPath(flankRoadWest, 2, 1);
+      paintRotationalPath(flankRoadEast, 2, 1);
+      paintRotationalPath([
+        { x: center.x - 25, y: 30 },
+        { x: center.x - 20, y: 39 },
+        { x: center.x - 15, y: 46 },
+      ], 2, 1);
+
+      // Large forests around each spawn and along side lanes
+      paintRotationalEllipse(center.x - 20, 13, 10, 5, 4);
+      paintRotationalEllipse(center.x - 25, 34, 8, 6, 4);
+      paintRotationalEllipse(center.x - 30, 58, 6, 9, 4);
+      paintRotationalEllipse(center.x - 18, 84, 7, 5, 4);
+      paintRotationalEllipse(center.x - 10, 25, 4, 3, 4);
+      paintRotationalEllipse(center.x + 10, 25, 4, 3, 4);
+
+      // Cliffs / rocky blockers creating choke points without full dead ends
+      paintRotationalEllipse(center.x - 13, 42, 5, 3, 3);
+      paintRotationalEllipse(center.x + 13, 42, 5, 3, 3);
+      paintRotationalEllipse(center.x - 28, 63, 4, 8, 3);
+      paintRotationalEllipse(center.x + 28, 63, 4, 8, 3);
+      paintRotationalEllipse(center.x - 17, 88, 6, 3, 3);
+      paintRotationalEllipse(center.x + 17, 88, 6, 3, 3);
+      paintRotationalEllipse(center.x, 98, 5, 3, 2);
+      paintRotationalEllipse(center.x - 22, 46, 3, 2, 3);
+      paintRotationalEllipse(center.x + 22, 46, 3, 2, 3);
+
+      paintRotationalPath(mainRoad, 3, 1);
+      paintRotationalPath(expansionRoad, 2, 1);
+      paintRotationalPath(flankRoadWest, 2, 1);
+      paintRotationalPath(flankRoadEast, 2, 1);
+      paintPath(centerCrossRoad, 3, 1);
+
+      // Keep routes open near bases, mines, expansions, and central fight zone
+      reserveRotationalOpenArea(topSpawn.x, topSpawn.y, 15);
+      reserveRotationalOpenArea(topMainMine.x, topMainMine.y, 10);
+      reserveRotationalOpenArea(topExpansion.x, topExpansion.y, 9);
+      reserveRotationalOpenArea(center.x, center.y, 18);
+      reserveRotationalOpenArea(topBuildPocket.x, topBuildPocket.y, 7);
+      reserveRotationalOpenArea(center.x - 24, 25, 4);
+      reserveRotationalOpenArea(center.x - 28, 46, 4);
+      reserveRotationalOpenArea(center.x - 20, 73, 4);
+
+      setTile(center.x, center.y, 5);
+      setTile(center.x, topSpawn.y, 0);
+      setTile(topMainMine.x, topMainMine.y, 1);
+
+      // Key mines: one main mine per base and one outer expansion per side
+      placeRotationalGold(topMainMine, 6500);
+      placeRotationalGold(topExpansion, 4200);
+
+      // Keep food for game compatibility, but place it as low-profile side economy patches
+      placeRotationalFood(topFoodLeft);
+      placeRotationalFood(topFoodRight);
+
+      // Dense lumber lines around each side
+      placeRotationalWood(topNearWoodLeft, smallWoodPattern);
+      placeRotationalWood(topNearWoodRight, smallWoodPattern);
+      placeRotationalWood({ x: center.x - 26, y: 34 });
+      placeRotationalWood({ x: center.x - 30, y: 60 });
 
       G.map.tiles = tiles;
       G.map.resources = resources;
