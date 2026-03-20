@@ -1061,26 +1061,22 @@
                 display: grid;
                 gap: 10px;
             }
-            .lobby-flow {
+            .lobby-quick-notes {
                 display: grid;
-                gap: 10px;
+                gap: 8px;
             }
-            .lobby-flow-step {
-                padding: 12px 14px;
-                border-radius: 14px;
+            .lobby-quick-note {
+                padding: 10px 12px;
+                border-radius: 12px;
                 background: rgba(255, 255, 255, 0.035);
                 border: 1px solid rgba(255, 255, 255, 0.06);
-            }
-            .lobby-flow-step strong {
-                display: block;
-                color: #fff;
-                margin-bottom: 4px;
-                font-size: 13px;
-            }
-            .lobby-flow-step span {
-                color: #90a0bd;
+                color: #95a4c1;
                 font-size: 12px;
                 line-height: 1.6;
+            }
+            .lobby-quick-note strong {
+                color: #eef3ff;
+                margin-right: 6px;
             }
             .lobby-room-stack {
                 display: grid;
@@ -1505,19 +1501,16 @@
                                 </div>
                             </div>
                             <div class="lobby-card">
-                                <h3>联机流程</h3>
-                                <div class="lobby-flow">
-                                    <div class="lobby-flow-step">
-                                        <strong>1. 选择阵营</strong>
-                                        <span>大厅会继承你在首页选中的阵营。</span>
+                                <h3>对战提示</h3>
+                                <div class="lobby-quick-notes">
+                                    <div class="lobby-quick-note">
+                                        <strong>快速匹配：</strong>适合直接开战，系统会自动寻找在线对手。
                                     </div>
-                                    <div class="lobby-flow-step">
-                                        <strong>2. 快速匹配或建房</strong>
-                                        <span>可以立即排队，也可以通过房间码邀请好友。</span>
+                                    <div class="lobby-quick-note">
+                                        <strong>好友房间：</strong>创建房间后把 4 位房间号发给好友即可。
                                     </div>
-                                    <div class="lobby-flow-step">
-                                        <strong>3. 双方准备</strong>
-                                        <span>房间模式下双方准备完成后自动开局。</span>
+                                    <div class="lobby-quick-note">
+                                        <strong>准备开始：</strong>房间模式下双方准备完成后会自动进入对局。
                                     </div>
                                 </div>
                             </div>
